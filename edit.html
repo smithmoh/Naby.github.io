@@ -1,0 +1,437 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Edit Posts Administration Screen.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! $typenow ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Invalid post type.&#39; ) );<br/>
+}<br/>
+<br/>
+if ( ! in_array( $typenow, get_post_types( array( &#39;show_ui&#39; =&gt; true ) ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to edit posts in this post type.&#39; ) );<br/>
+}<br/>
+<br/>
+if ( &#39;attachment&#39; === $typenow ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( wp_redirect( admin_url( &#39;upload.php&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global string       $post_type<br/>
+ * @global WP_Post_Type $post_type_object<br/>
+ */<br/>
+global $post_type, $post_type_object;<br/>
+<br/>
+$post_type        = $typenow;<br/>
+$post_type_object = get_post_type_object( $post_type );<br/>
+<br/>
+if ( ! $post_type_object ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Invalid post type.&#39; ) );<br/>
+}<br/>
+<br/>
+if ( ! current_user_can( $post_type_object&ndash;&gt;cap&ndash;&gt;edit_posts ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;You need a higher level of permission.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Sorry, you are not allowed to edit posts in this post type.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+$wp_list_table = _get_list_table( &#39;WP_Posts_List_Table&#39; );<br/>
+$pagenum       = $wp_list_table&ndash;&gt;get_pagenum();<br/>
+<br/>
+// Back&ndash;compat for viewing comments of an entry<br/>
+foreach ( array( &#39;p&#39;, &#39;attachment_id&#39;, &#39;page_id&#39; ) as $_redirect ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $_REQUEST[ $_redirect ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;edit&ndash;comments.php?p=&#39; . absint( $_REQUEST[ $_redirect ] ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+unset( $_redirect );<br/>
+<br/>
+if ( &#39;post&#39; != $post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;$parent_file   = &quot;edit.php?post_type=$post_type&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$submenu_file  = &quot;edit.php?post_type=$post_type&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$post_new_file = &quot;post&ndash;new.php?post_type=$post_type&quot;;<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$parent_file   = &#39;edit.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$submenu_file  = &#39;edit.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$post_new_file = &#39;post&ndash;new.php&#39;;<br/>
+}<br/>
+<br/>
+$doaction = $wp_list_table&ndash;&gt;current_action();<br/>
+<br/>
+if ( $doaction ) {<br/>
+&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;bulk&ndash;posts&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$sendback = remove_query_arg( array( &#39;trashed&#39;, &#39;untrashed&#39;, &#39;deleted&#39;, &#39;locked&#39;, &#39;ids&#39; ), wp_get_referer() );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $sendback ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback = admin_url( $parent_file );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;$sendback = add_query_arg( &#39;paged&#39;, $pagenum, $sendback );<br/>
+&nbsp;&nbsp;&nbsp;if ( strpos( $sendback, &#39;post.php&#39; ) !== false ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback = admin_url( $post_new_file );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;delete_all&#39; == $doaction ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Prepare for deletion of all posts with a specified post status (i.e. Empty trash).<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_status = preg_replace( &#39;/[^a&ndash;z0&ndash;9_&ndash;]+/i&#39;, &#39;&#39;, $_REQUEST[&#39;post_status&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Validate the post status exists.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( get_post_status_object( $post_status ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_ids = $wpdb&ndash;&gt;get_col( $wpdb&ndash;&gt;prepare( &quot;SELECT ID FROM $wpdb&ndash;&gt;posts WHERE post_type=%s AND post_status = %s&quot;, $post_type, $post_status ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$doaction = &#39;delete&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( isset( $_REQUEST[&#39;media&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_ids = $_REQUEST[&#39;media&#39;];<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( isset( $_REQUEST[&#39;ids&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_ids = explode( &#39;,&#39;, $_REQUEST[&#39;ids&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( ! empty( $_REQUEST[&#39;post&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_ids = array_map( &#39;intval&#39;, $_REQUEST[&#39;post&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! isset( $post_ids ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( $sendback );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;switch ( $doaction ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;trash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$trashed = $locked = 0;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( (array) $post_ids as $post_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;delete_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to move this item to the Trash.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( wp_check_post_lock( $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$locked++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! wp_trash_post( $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Error in moving to Trash.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$trashed++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback = add_query_arg(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;trashed&#39; =&gt; $trashed,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;ids&#39;     =&gt; join( &#39;,&#39;, $post_ids ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;locked&#39;  =&gt; $locked,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;untrash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$untrashed = 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( (array) $post_ids as $post_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;delete_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to restore this item from the Trash.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! wp_untrash_post( $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Error in restoring from Trash.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$untrashed++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback = add_query_arg( &#39;untrashed&#39;, $untrashed, $sendback );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;delete&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$deleted = 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( (array) $post_ids as $post_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_del = get_post( $post_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;delete_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to delete this item.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $post_del&ndash;&gt;post_type == &#39;attachment&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! wp_delete_attachment( $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Error in deleting.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! wp_delete_post( $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Error in deleting.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$deleted++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback = add_query_arg( &#39;deleted&#39;, $deleted, $sendback );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;edit&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_REQUEST[&#39;bulk_edit&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$done = bulk_edit_posts( $_REQUEST );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_array( $done ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$done[&#39;updated&#39;] = count( $done[&#39;updated&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$done[&#39;skipped&#39;] = count( $done[&#39;skipped&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$done[&#39;locked&#39;]  = count( $done[&#39;locked&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback        = add_query_arg( $done, $sendback );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;admin/edit&ndash;comments.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sendback = apply_filters( &#39;handle_bulk_actions&ndash;&#39; . get_current_screen()&ndash;&gt;id, $sendback, $doaction, $post_ids );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$sendback = remove_query_arg( array( &#39;action&#39;, &#39;action2&#39;, &#39;tags_input&#39;, &#39;post_author&#39;, &#39;comment_status&#39;, &#39;ping_status&#39;, &#39;_status&#39;, &#39;post&#39;, &#39;bulk_edit&#39;, &#39;post_view&#39; ), $sendback );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( $sendback );<br/>
+&nbsp;&nbsp;&nbsp;exit();<br/>
+} elseif ( ! empty( $_REQUEST[&#39;_wp_http_referer&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( remove_query_arg( array( &#39;_wp_http_referer&#39;, &#39;_wpnonce&#39; ), wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) ) );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+$wp_list_table&ndash;&gt;prepare_items();<br/>
+<br/>
+wp_enqueue_script( &#39;inline&ndash;edit&ndash;post&#39; );<br/>
+wp_enqueue_script( &#39;heartbeat&#39; );<br/>
+<br/>
+if ( &#39;wp_block&#39; === $post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;wp&ndash;list&ndash;reusable&ndash;blocks&#39; );<br/>
+&nbsp;&nbsp;&nbsp;wp_enqueue_style( &#39;wp&ndash;list&ndash;reusable&ndash;blocks&#39; );<br/>
+}<br/>
+<br/>
+$title = $post_type_object&ndash;&gt;labels&ndash;&gt;name;<br/>
+<br/>
+if ( &#39;post&#39; == $post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;This screen provides access to all of your posts. You can customize the display of this screen to suit your workflow.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;screen&ndash;content&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Screen Content&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;You can customize the display of this screen&amp;#8217;s contents in a number of ways:&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;ul&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;You can hide/display columns based on your needs and decide how many posts to list per screen using the Screen Options tab.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;You can filter the list of posts by post status using the text links above the posts list to only show posts with that status. The default view is to show all posts.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;You can view posts in a simple title list or with an excerpt using the Screen Options tab.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;You can refine the list to show only posts in a specific category or from a specific month by using the dropdown menus above the posts list. Click the Filter button after making your selection. You also can refine the list by clicking on the post author, category or tag in the posts list.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;/ul&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;action&ndash;links&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Available Actions&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;Hovering over a row in the posts list will display action links that allow you to manage your post. You can perform the following actions:&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;ul&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;&lt;strong&gt;Edit&lt;/strong&gt; takes you to the editing screen for that post. You can also reach that screen by clicking on the post title.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;&lt;strong&gt;Quick Edit&lt;/strong&gt; provides inline access to the metadata of your post, allowing you to update post details without leaving this screen.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;&lt;strong&gt;Trash&lt;/strong&gt; removes your post from this list and places it in the trash, from which you can permanently delete it.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;&lt;strong&gt;Preview&lt;/strong&gt; will show you what your draft post will look like if you publish it. View will take you to your live site to view the post. Which link is available depends on your post&amp;#8217;s status.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;/ul&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;bulk&ndash;actions&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Bulk Actions&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;You can also edit or move multiple posts to the trash at once. Select the posts you want to act on using the checkboxes, then select the action you want to take from the Bulk Actions menu and click Apply.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;When using Bulk Edit, you can change the metadata (categories, author, etc.) for all selected posts at once. To remove a post from the grouping, just click the x next to its name in the Bulk Edit area that appears.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Posts_Screen&quot;&gt;Documentation on Managing Posts&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+} elseif ( &#39;page&#39; == $post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;Pages are similar to posts in that they have a title, body text, and associated metadata, but they are different in that they are not part of the chronological blog stream, kind of like permanent posts. Pages are not categorized or tagged, but can have a hierarchy. You can nest pages under other pages by making one the &amp;#8220;Parent&amp;#8221; of the other, creating a group of pages.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;managing&ndash;pages&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Managing Pages&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;Managing pages is very similar to managing posts, and the screens can be customized in the same way.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;You can also perform the same types of actions, including narrowing the list by using the filters, acting on a page using the action links that appear when you hover over a row, or using the Bulk Actions menu to edit the metadata for multiple pages at once.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Pages_Screen&quot;&gt;Documentation on Managing Pages&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+}<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_screen_reader_content(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_views&#39;      =&gt; $post_type_object&ndash;&gt;labels&ndash;&gt;filter_items_list,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_pagination&#39; =&gt; $post_type_object&ndash;&gt;labels&ndash;&gt;items_list_navigation,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_list&#39;       =&gt; $post_type_object&ndash;&gt;labels&ndash;&gt;items_list,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+add_screen_option(<br/>
+&nbsp;&nbsp;&nbsp;&#39;per_page&#39;,<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;default&#39; =&gt; 20,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;option&#39;  =&gt; &#39;edit_&#39; . $post_type . &#39;_per_page&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+$bulk_counts = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;updated&#39;   =&gt; isset( $_REQUEST[&#39;updated&#39;] ) ? absint( $_REQUEST[&#39;updated&#39;] ) : 0,<br/>
+&nbsp;&nbsp;&nbsp;&#39;locked&#39;    =&gt; isset( $_REQUEST[&#39;locked&#39;] ) ? absint( $_REQUEST[&#39;locked&#39;] ) : 0,<br/>
+&nbsp;&nbsp;&nbsp;&#39;deleted&#39;   =&gt; isset( $_REQUEST[&#39;deleted&#39;] ) ? absint( $_REQUEST[&#39;deleted&#39;] ) : 0,<br/>
+&nbsp;&nbsp;&nbsp;&#39;trashed&#39;   =&gt; isset( $_REQUEST[&#39;trashed&#39;] ) ? absint( $_REQUEST[&#39;trashed&#39;] ) : 0,<br/>
+&nbsp;&nbsp;&nbsp;&#39;untrashed&#39; =&gt; isset( $_REQUEST[&#39;untrashed&#39;] ) ? absint( $_REQUEST[&#39;untrashed&#39;] ) : 0,<br/>
+);<br/>
+<br/>
+$bulk_messages             = array();<br/>
+$bulk_messages[&#39;post&#39;]     = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;updated&#39;   =&gt; _n( &#39;%s post updated.&#39;, &#39;%s posts updated.&#39;, $bulk_counts[&#39;updated&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;locked&#39;    =&gt; ( 1 == $bulk_counts[&#39;locked&#39;] ) ? __( &#39;1 post not updated, somebody is editing it.&#39; ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_n( &#39;%s post not updated, somebody is editing it.&#39;, &#39;%s posts not updated, somebody is editing them.&#39;, $bulk_counts[&#39;locked&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;deleted&#39;   =&gt; _n( &#39;%s post permanently deleted.&#39;, &#39;%s posts permanently deleted.&#39;, $bulk_counts[&#39;deleted&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;trashed&#39;   =&gt; _n( &#39;%s post moved to the Trash.&#39;, &#39;%s posts moved to the Trash.&#39;, $bulk_counts[&#39;trashed&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;untrashed&#39; =&gt; _n( &#39;%s post restored from the Trash.&#39;, &#39;%s posts restored from the Trash.&#39;, $bulk_counts[&#39;untrashed&#39;] ),<br/>
+);<br/>
+$bulk_messages[&#39;page&#39;]     = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;updated&#39;   =&gt; _n( &#39;%s page updated.&#39;, &#39;%s pages updated.&#39;, $bulk_counts[&#39;updated&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;locked&#39;    =&gt; ( 1 == $bulk_counts[&#39;locked&#39;] ) ? __( &#39;1 page not updated, somebody is editing it.&#39; ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_n( &#39;%s page not updated, somebody is editing it.&#39;, &#39;%s pages not updated, somebody is editing them.&#39;, $bulk_counts[&#39;locked&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;deleted&#39;   =&gt; _n( &#39;%s page permanently deleted.&#39;, &#39;%s pages permanently deleted.&#39;, $bulk_counts[&#39;deleted&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;trashed&#39;   =&gt; _n( &#39;%s page moved to the Trash.&#39;, &#39;%s pages moved to the Trash.&#39;, $bulk_counts[&#39;trashed&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;untrashed&#39; =&gt; _n( &#39;%s page restored from the Trash.&#39;, &#39;%s pages restored from the Trash.&#39;, $bulk_counts[&#39;untrashed&#39;] ),<br/>
+);<br/>
+$bulk_messages[&#39;wp_block&#39;] = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;updated&#39;   =&gt; _n( &#39;%s block updated.&#39;, &#39;%s blocks updated.&#39;, $bulk_counts[&#39;updated&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;locked&#39;    =&gt; ( 1 == $bulk_counts[&#39;locked&#39;] ) ? __( &#39;1 block not updated, somebody is editing it.&#39; ) : _n( &#39;%s block not updated, somebody is editing it.&#39;, &#39;%s blocks not updated, somebody is editing them.&#39;, $bulk_counts[&#39;locked&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;deleted&#39;   =&gt; _n( &#39;%s block permanently deleted.&#39;, &#39;%s blocks permanently deleted.&#39;, $bulk_counts[&#39;deleted&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;trashed&#39;   =&gt; _n( &#39;%s block moved to the Trash.&#39;, &#39;%s blocks moved to the Trash.&#39;, $bulk_counts[&#39;trashed&#39;] ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;untrashed&#39; =&gt; _n( &#39;%s block restored from the Trash.&#39;, &#39;%s blocks restored from the Trash.&#39;, $bulk_counts[&#39;untrashed&#39;] ),<br/>
+);<br/>
+<br/>
+/**<br/>
+ * Filters the bulk action updated messages.<br/>
+ *<br/>
+ * By default, custom post types use the messages for the &#39;post&#39; post type.<br/>
+ *<br/>
+ * @since 3.7.0<br/>
+ *<br/>
+ * @param array[] $bulk_messages Arrays of messages, each keyed by the corresponding post type. Messages are<br/>
+ *                               keyed with &#39;updated&#39;, &#39;locked&#39;, &#39;deleted&#39;, &#39;trashed&#39;, and &#39;untrashed&#39;.<br/>
+ * @param int[]   $bulk_counts   Array of item counts for each message, used to build internationalized strings.<br/>
+ */<br/>
+$bulk_messages = apply_filters( &#39;bulk_post_updated_messages&#39;, $bulk_messages, $bulk_counts );<br/>
+$bulk_counts   = array_filter( $bulk_counts );<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+?&gt;<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1 class=&quot;wp&ndash;heading&ndash;inline&quot;&gt;<br/>
+&lt;?php<br/>
+echo esc_html( $post_type_object&ndash;&gt;labels&ndash;&gt;name );<br/>
+?&gt;<br/>
+&lt;/h1&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( current_user_can( $post_type_object&ndash;&gt;cap&ndash;&gt;create_posts ) ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39; &lt;a href=&quot;&#39; . esc_url( admin_url( $post_new_file ) ) . &#39;&quot; class=&quot;page&ndash;title&ndash;action&quot;&gt;&#39; . esc_html( $post_type_object&ndash;&gt;labels&ndash;&gt;add_new ) . &#39;&lt;/a&gt;&#39;;<br/>
+}<br/>
+<br/>
+if ( isset( $_REQUEST[&#39;s&#39;] ) &amp;&amp; strlen( $_REQUEST[&#39;s&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: search keywords */<br/>
+&nbsp;&nbsp;&nbsp;printf( &#39; &lt;span class=&quot;subtitle&quot;&gt;&#39; . __( &#39;Search results for &amp;#8220;%s&amp;#8221;&#39; ) . &#39;&lt;/span&gt;&#39;, get_search_query() );<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;hr class=&quot;wp&ndash;header&ndash;end&quot;&gt;<br/>
+<br/>
+&lt;?php<br/>
+// If we have a bulk message to issue:<br/>
+$messages = array();<br/>
+foreach ( $bulk_counts as $message =&gt; $count ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( isset( $bulk_messages[ $post_type ][ $message ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( $bulk_messages[ $post_type ][ $message ], number_format_i18n( $count ) );<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( isset( $bulk_messages[&#39;post&#39;][ $message ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( $bulk_messages[&#39;post&#39;][ $message ], number_format_i18n( $count ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $message == &#39;trashed&#39; &amp;&amp; isset( $_REQUEST[&#39;ids&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ids        = preg_replace( &#39;/[^0&ndash;9,]/&#39;, &#39;&#39;, $_REQUEST[&#39;ids&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = &#39;&lt;a href=&quot;&#39; . esc_url( wp_nonce_url( &quot;edit.php?post_type=$post_type&amp;doaction=undo&amp;action=untrash&amp;ids=$ids&quot;, &#39;bulk&ndash;posts&#39; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Undo&#39; ) . &#39;&lt;/a&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( $messages ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;div id=&quot;message&quot; class=&quot;updated notice is&ndash;dismissible&quot;&gt;&lt;p&gt;&#39; . join( &#39; &#39;, $messages ) . &#39;&lt;/p&gt;&lt;/div&gt;&#39;;<br/>
+}<br/>
+unset( $messages );<br/>
+<br/>
+$_SERVER[&#39;REQUEST_URI&#39;] = remove_query_arg( array( &#39;locked&#39;, &#39;skipped&#39;, &#39;updated&#39;, &#39;deleted&#39;, &#39;trashed&#39;, &#39;untrashed&#39; ), $_SERVER[&#39;REQUEST_URI&#39;] );<br/>
+?&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;views(); ?&gt;<br/>
+<br/>
+&lt;form id=&quot;posts&ndash;filter&quot; method=&quot;get&quot;&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;search_box( $post_type_object&ndash;&gt;labels&ndash;&gt;search_items, &#39;post&#39; ); ?&gt;<br/>
+<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;post_status&quot; class=&quot;post_status_page&quot; value=&quot;&lt;?php echo ! empty( $_REQUEST[&#39;post_status&#39;] ) ? esc_attr( $_REQUEST[&#39;post_status&#39;] ) : &#39;all&#39;; ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;post_type&quot; class=&quot;post_type_page&quot; value=&quot;&lt;?php echo $post_type; ?&gt;&quot; /&gt;<br/>
+<br/>
+&lt;?php if ( ! empty( $_REQUEST[&#39;author&#39;] ) ) { ?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;author&quot; value=&quot;&lt;?php echo esc_attr( $_REQUEST[&#39;author&#39;] ); ?&gt;&quot; /&gt;<br/>
+&lt;?php } ?&gt;<br/>
+<br/>
+&lt;?php if ( ! empty( $_REQUEST[&#39;show_sticky&#39;] ) ) { ?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;show_sticky&quot; value=&quot;1&quot; /&gt;<br/>
+&lt;?php } ?&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;display(); ?&gt;<br/>
+<br/>
+&lt;/form&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( $wp_list_table&ndash;&gt;has_items() ) {<br/>
+&nbsp;&nbsp;&nbsp;$wp_list_table&ndash;&gt;inline_edit();<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;ajax&ndash;response&quot;&gt;&lt;/div&gt;<br/>
+&lt;br class=&quot;clear&quot; /&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );</body></html>

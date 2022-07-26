@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Handles Comment Post to WordPress and prevents duplicate comment posting.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+if ( &#39;POST&#39; != $_SERVER[&#39;REQUEST_METHOD&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;$protocol = $_SERVER[&#39;SERVER_PROTOCOL&#39;];<br/>
+&nbsp;&nbsp;&nbsp;if ( ! in_array( $protocol, array( &#39;HTTP/1.1&#39;, &#39;HTTP/2&#39;, &#39;HTTP/2.0&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$protocol = &#39;HTTP/1.0&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;header( &#39;Allow: POST&#39; );<br/>
+&nbsp;&nbsp;&nbsp;header( &quot;$protocol 405 Method Not Allowed&quot; );<br/>
+&nbsp;&nbsp;&nbsp;header( &#39;Content&ndash;Type: text/plain&#39; );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+/** Sets up the WordPress Environment. */<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+$comment = wp_handle_comment_submission( wp_unslash( $_POST ) );<br/>
+if ( is_wp_error( $comment ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$data = intval( $comment&ndash;&gt;get_error_data() );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $data ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . $comment&ndash;&gt;get_error_message() . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Comment Submission Failure&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;response&#39;  =&gt; $data,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;back_link&#39; =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+$user            = wp_get_current_user();<br/>
+$cookies_consent = ( isset( $_POST[&#39;wp&ndash;comment&ndash;cookies&ndash;consent&#39;] ) );<br/>
+<br/>
+/**<br/>
+ * Perform other actions when comment cookies are set.<br/>
+ *<br/>
+ * @since 3.4.0<br/>
+ * @since 4.9.6 The `$cookies_consent` parameter was added.<br/>
+ *<br/>
+ * @param WP_Comment $comment         Comment object.<br/>
+ * @param WP_User    $user            Comment author&#39;s user object. The user may not exist.<br/>
+ * @param boolean    $cookies_consent Comment author&#39;s consent to store cookies.<br/>
+ */<br/>
+do_action( &#39;set_comment_cookies&#39;, $comment, $user, $cookies_consent );<br/>
+<br/>
+$location = empty( $_POST[&#39;redirect_to&#39;] ) ? get_comment_link( $comment ) : $_POST[&#39;redirect_to&#39;] . &#39;#comment&ndash;&#39; . $comment&ndash;&gt;comment_ID;<br/>
+<br/>
+// If user didn&#39;t consent to cookies, add specific query arguments to display the awaiting moderation message.<br/>
+if ( ! $cookies_consent &amp;&amp; &#39;unapproved&#39; === wp_get_comment_status( $comment ) &amp;&amp; ! empty( $comment&ndash;&gt;comment_author_email ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$location = add_query_arg(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;unapproved&#39;      =&gt; $comment&ndash;&gt;comment_ID,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;moderation&ndash;hash&#39; =&gt; wp_hash( $comment&ndash;&gt;comment_date_gmt ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$location<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Filters the location URI to send the commenter after posting.<br/>
+ *<br/>
+ * @since 2.0.5<br/>
+ *<br/>
+ * @param string     $location The &#39;redirect_to&#39; URI sent via $_POST.<br/>
+ * @param WP_Comment $comment  Comment object.<br/>
+ */<br/>
+$location = apply_filters( &#39;comment_post_redirect&#39;, $location, $comment );<br/>
+<br/>
+wp_safe_redirect( $location );<br/>
+exit;</body></html>

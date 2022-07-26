@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Administration Template Footer<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+// don&#39;t load directly<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die( &#39;&ndash;1&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global string $hook_suffix<br/>
+ */<br/>
+global $hook_suffix;<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;!&ndash;&ndash; wpbody&ndash;content &ndash;&ndash;&gt;<br/>
+&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;!&ndash;&ndash; wpbody &ndash;&ndash;&gt;<br/>
+&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;!&ndash;&ndash; wpcontent &ndash;&ndash;&gt;<br/>
+<br/>
+&lt;div id=&quot;wpfooter&quot; role=&quot;contentinfo&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires after the opening tag for the admin footer.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;in_admin_footer&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;footer&ndash;left&quot; class=&quot;alignleft&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$text = sprintf( __( &#39;Thank you for creating with &lt;a href=&quot;%s&quot;&gt;WordPress&lt;/a&gt;.&#39; ), __( &#39;https://wordpress.org/&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the &quot;Thank you&quot; text displayed in the admin footer.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.8.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $text The content that will be printed.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;admin_footer_text&#39;, &#39;&lt;span id=&quot;footer&ndash;thankyou&quot;&gt;&#39; . $text . &#39;&lt;/span&gt;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;footer&ndash;upgrade&quot; class=&quot;alignright&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the version/update text displayed in the admin footer.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * WordPress prints the current version and update information,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * using core_update_footer() at priority 10.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.3.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @see core_update_footer()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $content The content that will be printed.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;update_footer&#39;, &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;?php<br/>
+/**<br/>
+ * Prints scripts or data before the default footer scripts.<br/>
+ *<br/>
+ * @since 1.2.0<br/>
+ *<br/>
+ * @param string $data The data to print.<br/>
+ */<br/>
+do_action( &#39;admin_footer&#39;, &#39;&#39; );<br/>
+<br/>
+/**<br/>
+ * Prints scripts and data queued for the footer.<br/>
+ *<br/>
+ * The dynamic portion of the hook name, `$hook_suffix`,<br/>
+ * refers to the global hook suffix of the current page.<br/>
+ *<br/>
+ * @since 4.6.0<br/>
+ */<br/>
+do_action( &quot;admin_print_footer_scripts&ndash;{$hook_suffix}&quot; );<br/>
+<br/>
+/**<br/>
+ * Prints any scripts and data queued for the footer.<br/>
+ *<br/>
+ * @since 2.8.0<br/>
+ */<br/>
+do_action( &#39;admin_print_footer_scripts&#39; );<br/>
+<br/>
+/**<br/>
+ * Prints scripts or data after the default footer scripts.<br/>
+ *<br/>
+ * The dynamic portion of the hook name, `$hook_suffix`,<br/>
+ * refers to the global hook suffix of the current page.<br/>
+ *<br/>
+ * @since 2.8.0<br/>
+ */<br/>
+do_action( &quot;admin_footer&ndash;{$hook_suffix}&quot; );<br/>
+<br/>
+// get_site_option() won&#39;t exist when auto upgrading from &lt;= 2.7<br/>
+if ( function_exists( &#39;get_site_option&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( false === get_site_option( &#39;can_compress_scripts&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;compression_test();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;!&ndash;&ndash; wpwrap &ndash;&ndash;&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;if(typeof wpOnload==&#39;function&#39;)wpOnload();&lt;/script&gt;<br/>
+&lt;/body&gt;<br/>
+&lt;/html&gt;</body></html>

@@ -1,0 +1,552 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Used to set up and fix common variables and include<br/>
+ * the WordPress procedural and class library.<br/>
+ *<br/>
+ * Allows for some configuration in wp&ndash;config.php (see default&ndash;constants.php)<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * Stores the location of the WordPress directory of functions, classes, and core content.<br/>
+ *<br/>
+ * @since 1.0.0<br/>
+ */<br/>
+define( &#39;WPINC&#39;, &#39;wp&ndash;includes&#39; );<br/>
+<br/>
+// Include files required for initialization.<br/>
+require( ABSPATH . WPINC . &#39;/load.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;paused&ndash;extensions&ndash;storage.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;fatal&ndash;error&ndash;handler.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;recovery&ndash;mode&ndash;cookie&ndash;service.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;recovery&ndash;mode&ndash;key&ndash;service.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;recovery&ndash;mode&ndash;link&ndash;service.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;recovery&ndash;mode&ndash;email&ndash;service.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;recovery&ndash;mode.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/error&ndash;protection.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/default&ndash;constants.php&#39; );<br/>
+require_once( ABSPATH . WPINC . &#39;/plugin.php&#39; );<br/>
+<br/>
+/*<br/>
+ * These can&#39;t be directly globalized in version.php. When updating,<br/>
+ * we&#39;re including version.php from another installation and don&#39;t want<br/>
+ * these values to be overridden if already set.<br/>
+ */<br/>
+global $wp_version, $wp_db_version, $tinymce_version, $required_php_version, $required_mysql_version, $wp_local_package;<br/>
+require( ABSPATH . WPINC . &#39;/version.php&#39; );<br/>
+<br/>
+/**<br/>
+ * If not already configured, `$blog_id` will default to 1 in a single site<br/>
+ * configuration. In multisite, it will be overridden by default in ms&ndash;settings.php.<br/>
+ *<br/>
+ * @global int $blog_id<br/>
+ * @since 2.0.0<br/>
+ */<br/>
+global $blog_id;<br/>
+<br/>
+// Set initial default constants including WP_MEMORY_LIMIT, WP_MAX_MEMORY_LIMIT, WP_DEBUG, SCRIPT_DEBUG, WP_CONTENT_DIR and WP_CACHE.<br/>
+wp_initial_constants();<br/>
+<br/>
+// Make sure we register the shutdown handler for fatal errors as soon as possible.<br/>
+wp_register_fatal_error_handler();<br/>
+<br/>
+// Check for the required PHP version and for the MySQL extension or a database drop&ndash;in.<br/>
+wp_check_php_mysql_versions();<br/>
+<br/>
+// Disable magic quotes at runtime. Magic quotes are added using wpdb later in wp&ndash;settings.php.<br/>
+@ini_set( &#39;magic_quotes_runtime&#39;, 0 );<br/>
+@ini_set( &#39;magic_quotes_sybase&#39;, 0 );<br/>
+<br/>
+// WordPress calculates offsets from UTC.<br/>
+date_default_timezone_set( &#39;UTC&#39; );<br/>
+<br/>
+// Turn register_globals off.<br/>
+wp_unregister_GLOBALS();<br/>
+<br/>
+// Standardize $_SERVER variables across setups.<br/>
+wp_fix_server_vars();<br/>
+<br/>
+// Check if we have received a request due to missing favicon.ico<br/>
+wp_favicon_request();<br/>
+<br/>
+// Check if we&#39;re in maintenance mode.<br/>
+wp_maintenance();<br/>
+<br/>
+// Start loading timer.<br/>
+timer_start();<br/>
+<br/>
+// Check if we&#39;re in WP_DEBUG mode.<br/>
+wp_debug_mode();<br/>
+<br/>
+/**<br/>
+ * Filters whether to enable loading of the advanced&ndash;cache.php drop&ndash;in.<br/>
+ *<br/>
+ * This filter runs before it can be used by plugins. It is designed for non&ndash;web<br/>
+ * run&ndash;times. If false is returned, advanced&ndash;cache.php will never be loaded.<br/>
+ *<br/>
+ * @since 4.6.0<br/>
+ *<br/>
+ * @param bool $enable_advanced_cache Whether to enable loading advanced&ndash;cache.php (if present).<br/>
+ *                                    Default true.<br/>
+ */<br/>
+if ( WP_CACHE &amp;&amp; apply_filters( &#39;enable_loading_advanced_cache_dropin&#39;, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;// For an advanced caching plugin to use. Uses a static drop&ndash;in because you would only want one.<br/>
+&nbsp;&nbsp;&nbsp;WP_DEBUG ? include( WP_CONTENT_DIR . &#39;/advanced&ndash;cache.php&#39; ) : @include( WP_CONTENT_DIR . &#39;/advanced&ndash;cache.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Re&ndash;initialize any hooks added manually by advanced&ndash;cache.php<br/>
+&nbsp;&nbsp;&nbsp;if ( $wp_filter ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wp_filter = WP_Hook::build_preinitialized_hooks( $wp_filter );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+// Define WP_LANG_DIR if not set.<br/>
+wp_set_lang_dir();<br/>
+<br/>
+// Load early WordPress files.<br/>
+require( ABSPATH . WPINC . &#39;/compat.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;list&ndash;util.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/formatting.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/meta.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/functions.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;meta&ndash;query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;matchesmapregex.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;error.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/pomo/mo.php&#39; );<br/>
+<br/>
+// Include the wpdb class and, if present, a db.php database drop&ndash;in.<br/>
+global $wpdb;<br/>
+require_wp_db();<br/>
+<br/>
+// Set the database table prefix and the format specifiers for database table columns.<br/>
+$GLOBALS[&#39;table_prefix&#39;] = $table_prefix;<br/>
+wp_set_wpdb_vars();<br/>
+<br/>
+// Start the WordPress object cache, or an external object cache if the drop&ndash;in is present.<br/>
+wp_start_object_cache();<br/>
+<br/>
+// Attach the default filters.<br/>
+require( ABSPATH . WPINC . &#39;/default&ndash;filters.php&#39; );<br/>
+<br/>
+// Initialize multisite if enabled.<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;site&ndash;query.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;network&ndash;query.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/ms&ndash;blogs.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/ms&ndash;settings.php&#39; );<br/>
+} elseif ( ! defined( &#39;MULTISITE&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;MULTISITE&#39;, false );<br/>
+}<br/>
+<br/>
+register_shutdown_function( &#39;shutdown_action_hook&#39; );<br/>
+<br/>
+// Stop most of WordPress from being loaded if we just want the basics.<br/>
+if ( SHORTINIT ) {<br/>
+&nbsp;&nbsp;&nbsp;return false;<br/>
+}<br/>
+<br/>
+// Load the L10n library.<br/>
+require_once( ABSPATH . WPINC . &#39;/l10n.php&#39; );<br/>
+require_once( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;locale.php&#39; );<br/>
+require_once( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;locale&ndash;switcher.php&#39; );<br/>
+<br/>
+// Run the installer if WordPress is not installed.<br/>
+wp_not_installed();<br/>
+<br/>
+// Load most of WordPress.<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;walker.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;ajax&ndash;response.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/capabilities.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;roles.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;role.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;user.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/date.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/theme.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;theme.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/user.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;user&ndash;query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;session&ndash;tokens.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;user&ndash;meta&ndash;session&ndash;tokens.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;metadata&ndash;lazyloader.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/general&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/link&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/author&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/post.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;walker&ndash;page.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;walker&ndash;page&ndash;dropdown.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;post&ndash;type.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;post.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/post&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/revision.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/post&ndash;formats.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/post&ndash;thumbnail&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/category.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;walker&ndash;category.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;walker&ndash;category&ndash;dropdown.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/category&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/comment.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;comment.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;comment&ndash;query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;walker&ndash;comment.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/comment&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rewrite.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;rewrite.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/feed.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/bookmark.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/bookmark&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/kses.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/cron.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/deprecated.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/script&ndash;loader.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/taxonomy.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;taxonomy.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;term.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;term&ndash;query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;tax&ndash;query.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/update.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/canonical.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/shortcodes.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/embed.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;embed.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;oembed.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;oembed&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/media.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/http.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;http.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;streams.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;curl.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;proxy.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;cookie.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;encoding.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;response.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;requests&ndash;response.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;http&ndash;requests&ndash;hooks.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/widgets.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;widget.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;widget&ndash;factory.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/nav&ndash;menu.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/nav&ndash;menu&ndash;template.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/admin&ndash;bar.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/class&ndash;wp&ndash;rest&ndash;server.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/class&ndash;wp&ndash;rest&ndash;response.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/class&ndash;wp&ndash;rest&ndash;request.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;posts&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;attachments&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;post&ndash;types&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;post&ndash;statuses&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;revisions&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;autosaves&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;taxonomies&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;terms&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;users&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;comments&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;search&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;blocks&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;block&ndash;renderer&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;settings&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/endpoints/class&ndash;wp&ndash;rest&ndash;themes&ndash;controller.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/fields/class&ndash;wp&ndash;rest&ndash;meta&ndash;fields.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/fields/class&ndash;wp&ndash;rest&ndash;comment&ndash;meta&ndash;fields.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/fields/class&ndash;wp&ndash;rest&ndash;post&ndash;meta&ndash;fields.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/fields/class&ndash;wp&ndash;rest&ndash;term&ndash;meta&ndash;fields.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/fields/class&ndash;wp&ndash;rest&ndash;user&ndash;meta&ndash;fields.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/search/class&ndash;wp&ndash;rest&ndash;search&ndash;handler.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/rest&ndash;api/search/class&ndash;wp&ndash;rest&ndash;post&ndash;search&ndash;handler.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;block&ndash;type.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;block&ndash;type&ndash;registry.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;block&ndash;parser.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/archives.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/block.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/calendar.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/categories.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/latest&ndash;comments.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/latest&ndash;posts.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/rss.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/search.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/shortcode.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/blocks/tag&ndash;cloud.php&#39; );<br/>
+<br/>
+$GLOBALS[&#39;wp_embed&#39;] = new WP_Embed();<br/>
+<br/>
+// Load multisite&ndash;specific files.<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/ms&ndash;functions.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/ms&ndash;default&ndash;filters.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . WPINC . &#39;/ms&ndash;deprecated.php&#39; );<br/>
+}<br/>
+<br/>
+// Define constants that rely on the API to obtain the default value.<br/>
+// Define must&ndash;use plugin directory constants, which may be overridden in the sunrise.php drop&ndash;in.<br/>
+wp_plugin_directory_constants();<br/>
+<br/>
+$GLOBALS[&#39;wp_plugin_paths&#39;] = array();<br/>
+<br/>
+// Load must&ndash;use plugins.<br/>
+foreach ( wp_get_mu_plugins() as $mu_plugin ) {<br/>
+&nbsp;&nbsp;&nbsp;include_once( $mu_plugin );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires once a single must&ndash;use plugin has loaded.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 5.1.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $mu_plugin Full path to the plugin&#39;s main file.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;mu_plugin_loaded&#39;, $mu_plugin );<br/>
+}<br/>
+unset( $mu_plugin );<br/>
+<br/>
+// Load network activated plugins.<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;foreach ( wp_get_active_network_plugins() as $network_plugin ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_register_plugin_realpath( $network_plugin );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include_once( $network_plugin );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires once a single network&ndash;activated plugin has loaded.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 5.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $network_plugin Full path to the plugin&#39;s main file.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;network_plugin_loaded&#39;, $network_plugin );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;unset( $network_plugin );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Fires once all must&ndash;use and network&ndash;activated plugins have loaded.<br/>
+ *<br/>
+ * @since 2.8.0<br/>
+ */<br/>
+do_action( &#39;muplugins_loaded&#39; );<br/>
+<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;ms_cookie_constants();<br/>
+}<br/>
+<br/>
+// Define constants after multisite is loaded.<br/>
+wp_cookie_constants();<br/>
+<br/>
+// Define and enforce our SSL constants<br/>
+wp_ssl_constants();<br/>
+<br/>
+// Create common globals.<br/>
+require( ABSPATH . WPINC . &#39;/vars.php&#39; );<br/>
+<br/>
+// Make taxonomies and posts available to plugins and themes.<br/>
+// @plugin authors: warning: these get registered again on the init hook.<br/>
+create_initial_taxonomies();<br/>
+create_initial_post_types();<br/>
+<br/>
+wp_start_scraping_edited_file_errors();<br/>
+<br/>
+// Register the default theme directory root<br/>
+register_theme_directory( get_theme_root() );<br/>
+<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;// Handle users requesting a recovery mode link and initiating recovery mode.<br/>
+&nbsp;&nbsp;&nbsp;wp_recovery_mode()&ndash;&gt;initialize();<br/>
+}<br/>
+<br/>
+// Load active plugins.<br/>
+foreach ( wp_get_active_and_valid_plugins() as $plugin ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_register_plugin_realpath( $plugin );<br/>
+&nbsp;&nbsp;&nbsp;include_once( $plugin );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires once a single activated plugin has loaded.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 5.1.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $plugin Full path to the plugin&#39;s main file.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;plugin_loaded&#39;, $plugin );<br/>
+}<br/>
+unset( $plugin );<br/>
+<br/>
+// Load pluggable functions.<br/>
+require( ABSPATH . WPINC . &#39;/pluggable.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/pluggable&ndash;deprecated.php&#39; );<br/>
+<br/>
+// Set internal encoding.<br/>
+wp_set_internal_encoding();<br/>
+<br/>
+// Run wp_cache_postload() if object cache is enabled and the function exists.<br/>
+if ( WP_CACHE &amp;&amp; function_exists( &#39;wp_cache_postload&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_cache_postload();<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Fires once activated plugins have loaded.<br/>
+ *<br/>
+ * Pluggable functions are also available at this point in the loading order.<br/>
+ *<br/>
+ * @since 1.5.0<br/>
+ */<br/>
+do_action( &#39;plugins_loaded&#39; );<br/>
+<br/>
+// Define constants which affect functionality if not already defined.<br/>
+wp_functionality_constants();<br/>
+<br/>
+// Add magic quotes and set up $_REQUEST ( $_GET + $_POST )<br/>
+wp_magic_quotes();<br/>
+<br/>
+/**<br/>
+ * Fires when comment cookies are sanitized.<br/>
+ *<br/>
+ * @since 2.0.11<br/>
+ */<br/>
+do_action( &#39;sanitize_comment_cookies&#39; );<br/>
+<br/>
+/**<br/>
+ * WordPress Query object<br/>
+ *<br/>
+ * @global WP_Query $wp_the_query<br/>
+ * @since 2.0.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp_the_query&#39;] = new WP_Query();<br/>
+<br/>
+/**<br/>
+ * Holds the reference to @see $wp_the_query<br/>
+ * Use this global for WordPress queries<br/>
+ *<br/>
+ * @global WP_Query $wp_query<br/>
+ * @since 1.5.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp_query&#39;] = $GLOBALS[&#39;wp_the_query&#39;];<br/>
+<br/>
+/**<br/>
+ * Holds the WordPress Rewrite object for creating pretty URLs<br/>
+ *<br/>
+ * @global WP_Rewrite $wp_rewrite<br/>
+ * @since 1.5.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp_rewrite&#39;] = new WP_Rewrite();<br/>
+<br/>
+/**<br/>
+ * WordPress Object<br/>
+ *<br/>
+ * @global WP $wp<br/>
+ * @since 2.0.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp&#39;] = new WP();<br/>
+<br/>
+/**<br/>
+ * WordPress Widget Factory Object<br/>
+ *<br/>
+ * @global WP_Widget_Factory $wp_widget_factory<br/>
+ * @since 2.8.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp_widget_factory&#39;] = new WP_Widget_Factory();<br/>
+<br/>
+/**<br/>
+ * WordPress User Roles<br/>
+ *<br/>
+ * @global WP_Roles $wp_roles<br/>
+ * @since 2.0.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp_roles&#39;] = new WP_Roles();<br/>
+<br/>
+/**<br/>
+ * Fires before the theme is loaded.<br/>
+ *<br/>
+ * @since 2.6.0<br/>
+ */<br/>
+do_action( &#39;setup_theme&#39; );<br/>
+<br/>
+// Define the template related constants.<br/>
+wp_templating_constants();<br/>
+<br/>
+// Load the default text localization domain.<br/>
+load_default_textdomain();<br/>
+<br/>
+$locale      = get_locale();<br/>
+$locale_file = WP_LANG_DIR . &quot;/$locale.php&quot;;<br/>
+if ( ( 0 === validate_file( $locale ) ) &amp;&amp; is_readable( $locale_file ) ) {<br/>
+&nbsp;&nbsp;&nbsp;require( $locale_file );<br/>
+}<br/>
+unset( $locale_file );<br/>
+<br/>
+/**<br/>
+ * WordPress Locale object for loading locale domain date and various strings.<br/>
+ *<br/>
+ * @global WP_Locale $wp_locale<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+$GLOBALS[&#39;wp_locale&#39;] = new WP_Locale();<br/>
+<br/>
+/**<br/>
+ *  WordPress Locale Switcher object for switching locales.<br/>
+ *<br/>
+ * @since 4.7.0<br/>
+ *<br/>
+ * @global WP_Locale_Switcher $wp_locale_switcher WordPress locale switcher object.<br/>
+ */<br/>
+$GLOBALS[&#39;wp_locale_switcher&#39;] = new WP_Locale_Switcher();<br/>
+$GLOBALS[&#39;wp_locale_switcher&#39;]&ndash;&gt;init();<br/>
+<br/>
+// Load the functions for the active theme, for both parent and child theme if applicable.<br/>
+foreach ( wp_get_active_and_valid_themes() as $theme ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( file_exists( $theme . &#39;/functions.php&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include $theme . &#39;/functions.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+unset( $theme );<br/>
+<br/>
+/**<br/>
+ * Fires after the theme is loaded.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+do_action( &#39;after_setup_theme&#39; );<br/>
+<br/>
+// Set up current user.<br/>
+$GLOBALS[&#39;wp&#39;]&ndash;&gt;init();<br/>
+<br/>
+/**<br/>
+ * Fires after WordPress has finished loading but before any headers are sent.<br/>
+ *<br/>
+ * Most of WP is loaded at this stage, and the user is authenticated. WP continues<br/>
+ * to load on the {@see &#39;init&#39;} hook that follows (e.g. widgets), and many plugins instantiate<br/>
+ * themselves on it for all sorts of reasons (e.g. they need a user, a taxonomy, etc.).<br/>
+ *<br/>
+ * If you wish to plug an action once WP is loaded, use the {@see &#39;wp_loaded&#39;} hook below.<br/>
+ *<br/>
+ * @since 1.5.0<br/>
+ */<br/>
+do_action( &#39;init&#39; );<br/>
+<br/>
+// Check site status<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( true !== ( $file = ms_site_check() ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require( $file );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;unset( $file );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * This hook is fired once WP, all plugins, and the theme are fully loaded and instantiated.<br/>
+ *<br/>
+ * Ajax requests should use wp&ndash;admin/admin&ndash;ajax.php. admin&ndash;ajax.php can handle requests for<br/>
+ * users not logged in.<br/>
+ *<br/>
+ * @link https://codex.wordpress.org/AJAX_in_Plugins<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+do_action( &#39;wp_loaded&#39; );</body></html>

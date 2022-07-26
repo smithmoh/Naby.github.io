@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Credits administration panel.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+require_once( dirname( __FILE__ ) . &#39;/includes/credits.php&#39; );<br/>
+<br/>
+$title = __( &#39;Credits&#39; );<br/>
+<br/>
+list( $display_version ) = explode( &#39;&ndash;&#39;, get_bloginfo( &#39;version&#39; ) );<br/>
+<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+?&gt;<br/>
+&lt;div class=&quot;wrap about&ndash;wrap full&ndash;width&ndash;layout&quot;&gt;<br/>
+<br/>
+&lt;h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: The current WordPress version number */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Welcome to WordPress&amp;nbsp;%s&#39; ), $display_version );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/h1&gt;<br/>
+<br/>
+&lt;p class=&quot;about&ndash;text&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: The current WordPress version number */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Congratulations on updating to WordPress %s! This update makes it easier than ever to fix your site if something goes wrong.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$display_version<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/p&gt;<br/>
+<br/>
+&lt;div class=&quot;wp&ndash;badge&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: The current WordPress version number */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Version %s&#39; ), $display_version );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;nav class=&quot;nav&ndash;tab&ndash;wrapper wp&ndash;clearfix&quot; aria&ndash;label=&quot;&lt;?php esc_attr_e( &#39;Secondary menu&#39; ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;about.php&quot; class=&quot;nav&ndash;tab&quot;&gt;&lt;?php _e( &#39;What&amp;#8217;s New&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;credits.php&quot; class=&quot;nav&ndash;tab nav&ndash;tab&ndash;active&quot; aria&ndash;current=&quot;page&quot;&gt;&lt;?php _e( &#39;Credits&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;freedoms.php&quot; class=&quot;nav&ndash;tab&quot;&gt;&lt;?php _e( &#39;Freedoms&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;freedoms.php?privacy&ndash;notice&quot; class=&quot;nav&ndash;tab&quot;&gt;&lt;?php _e( &#39;Privacy&#39; ); ?&gt;&lt;/a&gt;<br/>
+&lt;/nav&gt;<br/>
+<br/>
+&lt;div class=&quot;about&ndash;wrap&ndash;content&quot;&gt;<br/>
+&lt;?php<br/>
+<br/>
+$credits = wp_credits();<br/>
+<br/>
+if ( ! $credits ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;about&ndash;description&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: https://wordpress.org/about/, 2: https://make.wordpress.org/ */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;WordPress is created by a &lt;a href=&quot;%1$s&quot;&gt;worldwide team&lt;/a&gt; of passionate individuals. &lt;a href=&quot;%2$s&quot;&gt;Get involved in WordPress&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;https://wordpress.org/about/&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;https://make.wordpress.org/&#39; )<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+echo &#39;&lt;p class=&quot;about&ndash;description&quot;&gt;&#39; . __( &#39;WordPress is created by a worldwide team of passionate individuals.&#39; ) . &quot;&lt;/p&gt;\n&quot;;<br/>
+<br/>
+echo &#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: https://make.wordpress.org/ */<br/>
+&nbsp;&nbsp;&nbsp;__( &#39;Want to see your name in lights on this page? &lt;a href=&quot;%s&quot;&gt;Get involved in WordPress&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;__( &#39;https://make.wordpress.org/&#39; )<br/>
+) . &#39;&lt;/p&gt;&#39;;<br/>
+<br/>
+foreach ( $credits[&#39;groups&#39;] as $group_slug =&gt; $group_data ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( $group_data[&#39;name&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;Translators&#39; == $group_data[&#39;name&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Considered a special slug in the API response. (Also, will never be returned for en_US.)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = _x( &#39;Translators&#39;, &#39;Translate this to be the equivalent of English Translators in your language for the credits page Translators section&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $group_data[&#39;placeholders&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// phpcs:ignore WordPress.WP.I18n.LowLevelTranslationFunction,WordPress.WP.I18n.NonSingularStringLiteralText<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = vsprintf( translate( $group_data[&#39;name&#39;] ), $group_data[&#39;placeholders&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// phpcs:ignore WordPress.WP.I18n.LowLevelTranslationFunction,WordPress.WP.I18n.NonSingularStringLiteralText<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = translate( $group_data[&#39;name&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;h2 class=&quot;wp&ndash;people&ndash;group&quot;&gt;&#39; . esc_html( $title ) . &quot;&lt;/h2&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $group_data[&#39;shuffle&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shuffle( $group_data[&#39;data&#39;] ); // We were going to sort by ability to pronounce &quot;hierarchical,&quot; but that wouldn&#39;t be fair to Matt.<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;switch ( $group_data[&#39;type&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;list&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array_walk( $group_data[&#39;data&#39;], &#39;_wp_credits_add_profile_link&#39;, $credits[&#39;data&#39;][&#39;profiles&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;wp&ndash;credits&ndash;list&quot;&gt;&#39; . wp_sprintf( &#39;%l.&#39;, $group_data[&#39;data&#39;] ) . &quot;&lt;/p&gt;\n\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;libraries&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array_walk( $group_data[&#39;data&#39;], &#39;_wp_credits_build_object_link&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;wp&ndash;credits&ndash;list&quot;&gt;&#39; . wp_sprintf( &#39;%l.&#39;, $group_data[&#39;data&#39;] ) . &quot;&lt;/p&gt;\n\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$compact = &#39;compact&#39; == $group_data[&#39;type&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$classes = &#39;wp&ndash;people&ndash;group &#39; . ( $compact ? &#39;compact&#39; : &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;ul class=&quot;&#39; . $classes . &#39;&quot; id=&quot;wp&ndash;people&ndash;group&ndash;&#39; . $group_slug . &#39;&quot;&gt;&#39; . &quot;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $group_data[&#39;data&#39;] as $person_data ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;li class=&quot;wp&ndash;person&quot; id=&quot;wp&ndash;person&ndash;&#39; . esc_attr( $person_data[2] ) . &#39;&quot;&gt;&#39; . &quot;\n\t&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;a href=&quot;&#39; . esc_url( sprintf( $credits[&#39;data&#39;][&#39;profiles&#39;], $person_data[2] ) ) . &#39;&quot; class=&quot;web&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size   = &#39;compact&#39; == $group_data[&#39;type&#39;] ? 30 : 60;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$data   = get_avatar_data( $person_data[1] . &#39;@md5.gravatar.com&#39;, array( &#39;size&#39; =&gt; $size ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size  *= 2;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$data2x = get_avatar_data( $person_data[1] . &#39;@md5.gravatar.com&#39;, array( &#39;size&#39; =&gt; $size ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;img src=&quot;&#39; . esc_url( $data[&#39;url&#39;] ) . &#39;&quot; srcset=&quot;&#39; . esc_url( $data2x[&#39;url&#39;] ) . &#39; 2x&quot; class=&quot;gravatar&quot; alt=&quot;&quot; /&gt;&#39; . &quot;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo esc_html( $person_data[0] ) . &quot;&lt;/a&gt;\n\t&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $compact ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// phpcs:ignore WordPress.WP.I18n.LowLevelTranslationFunction,WordPress.WP.I18n.NonSingularStringLiteralText<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;span class=&quot;title&quot;&gt;&#39; . translate( $person_data[3] ) . &quot;&lt;/span&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;/li&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;/ul&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;?php<br/>
+<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );<br/>
+<br/>
+return;<br/>
+<br/>
+// These are strings returned by the API that we want to be translatable<br/>
+__( &#39;Project Leaders&#39; );<br/>
+/* translators: %s: The current WordPress version number */<br/>
+__( &#39;Core Contributors to WordPress %s&#39; );<br/>
+__( &#39;Noteworthy Contributors&#39; );<br/>
+__( &#39;Cofounder, Project Lead&#39; );<br/>
+__( &#39;Lead Developer&#39; );<br/>
+__( &#39;Release Lead&#39; );<br/>
+__( &#39;Release Design Lead&#39; );<br/>
+__( &#39;Release Deputy&#39; );<br/>
+__( &#39;Core Developer&#39; );<br/>
+__( &#39;External Libraries&#39; );</body></html>

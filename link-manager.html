@@ -1,0 +1,135 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Link Management Administration Screen.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** Load WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+if ( ! current_user_can( &#39;manage_links&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to edit the links for this site.&#39; ) );<br/>
+}<br/>
+<br/>
+$wp_list_table = _get_list_table( &#39;WP_Links_List_Table&#39; );<br/>
+<br/>
+// Handle bulk deletes<br/>
+$doaction = $wp_list_table&ndash;&gt;current_action();<br/>
+<br/>
+if ( $doaction &amp;&amp; isset( $_REQUEST[&#39;linkcheck&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;bulk&ndash;bookmarks&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$redirect_to = admin_url( &#39;link&ndash;manager.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$bulklinks   = (array) $_REQUEST[&#39;linkcheck&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;delete&#39; == $doaction ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $bulklinks as $link_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$link_id = (int) $link_id;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_delete_link( $link_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;deleted&#39;, count( $bulklinks ), $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;admin/edit&ndash;comments.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = apply_filters( &#39;handle_bulk_actions&ndash;&#39; . get_current_screen()&ndash;&gt;id, $redirect_to, $doaction, $bulklinks );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+} elseif ( ! empty( $_GET[&#39;_wp_http_referer&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( remove_query_arg( array( &#39;_wp_http_referer&#39;, &#39;_wpnonce&#39; ), wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) ) );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+$wp_list_table&ndash;&gt;prepare_items();<br/>
+<br/>
+$title     = __( &#39;Links&#39; );<br/>
+$this_file = $parent_file = &#39;link&ndash;manager.php&#39;;<br/>
+<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . sprintf( __( &#39;You can add links here to be displayed on your site, usually using &lt;a href=&quot;%s&quot;&gt;Widgets&lt;/a&gt;. By default, links to several sites in the WordPress community are included as examples.&#39; ), &#39;widgets.php&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;Links may be separated into Link Categories; these are different than the categories used on your posts.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;You can customize the display of this screen using the Screen Options tab and/or the dropdown filters above the links table.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;deleting&ndash;links&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Deleting Links&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;If you delete a link, it will be removed permanently, as Links do not have a Trash function yet.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Links_Screen&quot;&gt;Documentation on Managing Links&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_screen_reader_content(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_list&#39; =&gt; __( &#39;Links list&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+include_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+if ( ! current_user_can( &#39;manage_links&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to edit the links for this site.&#39; ) );<br/>
+}<br/>
+<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;wrap nosubsub&quot;&gt;<br/>
+&lt;h1 class=&quot;wp&ndash;heading&ndash;inline&quot;&gt;<br/>
+&lt;?php<br/>
+echo esc_html( $title );<br/>
+?&gt;<br/>
+&lt;/h1&gt;<br/>
+<br/>
+&lt;a href=&quot;link&ndash;add.php&quot; class=&quot;page&ndash;title&ndash;action&quot;&gt;&lt;?php echo esc_html_x( &#39;Add New&#39;, &#39;link&#39; ); ?&gt;&lt;/a&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( isset( $_REQUEST[&#39;s&#39;] ) &amp;&amp; strlen( $_REQUEST[&#39;s&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: search keywords */<br/>
+&nbsp;&nbsp;&nbsp;printf( &#39;&lt;span class=&quot;subtitle&quot;&gt;&#39; . __( &#39;Search results for &amp;#8220;%s&amp;#8221;&#39; ) . &#39;&lt;/span&gt;&#39;, esc_html( wp_unslash( $_REQUEST[&#39;s&#39;] ) ) );<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;hr class=&quot;wp&ndash;header&ndash;end&quot;&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( isset( $_REQUEST[&#39;deleted&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;div id=&quot;message&quot; class=&quot;updated notice is&ndash;dismissible&quot;&gt;&lt;p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$deleted = (int) $_REQUEST[&#39;deleted&#39;];<br/>
+&nbsp;&nbsp;&nbsp;printf( _n( &#39;%s link deleted.&#39;, &#39;%s links deleted&#39;, $deleted ), $deleted );<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;/p&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$_SERVER[&#39;REQUEST_URI&#39;] = remove_query_arg( array( &#39;deleted&#39; ), $_SERVER[&#39;REQUEST_URI&#39;] );<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;form id=&quot;posts&ndash;filter&quot; method=&quot;get&quot;&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;search_box( __( &#39;Search Links&#39; ), &#39;link&#39; ); ?&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;display(); ?&gt;<br/>
+<br/>
+&lt;div id=&quot;ajax&ndash;response&quot;&gt;&lt;/div&gt;<br/>
+&lt;/form&gt;<br/>
+<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );</body></html>

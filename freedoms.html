@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Your Rights administration panel.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+$title = __( &#39;Freedoms&#39; );<br/>
+<br/>
+list( $display_version ) = explode( &#39;&ndash;&#39;, get_bloginfo( &#39;version&#39; ) );<br/>
+<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+$is_privacy_notice = isset( $_GET[&#39;privacy&ndash;notice&#39;] );<br/>
+<br/>
+if ( $is_privacy_notice ) {<br/>
+&nbsp;&nbsp;&nbsp;$freedoms_class        = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$privacy_class         = &#39; nav&ndash;tab&ndash;active&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$freedoms_aria_current = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$privacy_aria_current  = &#39; aria&ndash;current=&quot;page&quot;&#39;;<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$freedoms_class        = &#39; nav&ndash;tab&ndash;active&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$privacy_class         = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$freedoms_aria_current = &#39; aria&ndash;current=&quot;page&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$privacy_aria_current  = &#39;&#39;;<br/>
+}<br/>
+<br/>
+?&gt;<br/>
+&lt;div class=&quot;wrap about&ndash;wrap full&ndash;width&ndash;layout&quot;&gt;<br/>
+<br/>
+&lt;h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: The current WordPress version number */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Welcome to WordPress&amp;nbsp;%s&#39; ), $display_version );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/h1&gt;<br/>
+<br/>
+&lt;p class=&quot;about&ndash;text&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: The current WordPress version number */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Congratulations on updating to WordPress %s! This update makes it easier than ever to fix your site if something goes wrong.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$display_version<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/p&gt;<br/>
+<br/>
+&lt;div class=&quot;wp&ndash;badge&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: The current WordPress version number */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Version %s&#39; ), $display_version );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;nav class=&quot;nav&ndash;tab&ndash;wrapper wp&ndash;clearfix&quot; aria&ndash;label=&quot;&lt;?php esc_attr_e( &#39;Secondary menu&#39; ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;about.php&quot; class=&quot;nav&ndash;tab&quot;&gt;&lt;?php _e( &#39;What&amp;#8217;s New&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;credits.php&quot; class=&quot;nav&ndash;tab&quot;&gt;&lt;?php _e( &#39;Credits&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;freedoms.php&quot; class=&quot;nav&ndash;tab&lt;?php echo $freedoms_class; ?&gt;&quot;&lt;?php echo $freedoms_aria_current; ?&gt;&gt;&lt;?php _e( &#39;Freedoms&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;freedoms.php?privacy&ndash;notice&quot; class=&quot;nav&ndash;tab&lt;?php echo $privacy_class; ?&gt;&quot;&lt;?php echo $privacy_aria_current; ?&gt;&gt;&lt;?php _e( &#39;Privacy&#39; ); ?&gt;&lt;/a&gt;<br/>
+&lt;/nav&gt;<br/>
+<br/>
+&lt;?php if ( $is_privacy_notice ) : ?&gt;<br/>
+<br/>
+&lt;div class=&quot;about&ndash;wrap&ndash;content&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;about&ndash;description&quot;&gt;&lt;?php _e( &#39;From time to time, your WordPress site may send data to WordPress.org &amp;#8212; including, but not limited to &amp;#8212; the version of WordPress you are using, and a list of installed plugins and themes.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: https://wordpress.org/about/stats/ */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;This data is used to provide general enhancements to WordPress, which includes helping to protect your site by finding and automatically installing new updates. It is also used to calculate statistics, such as those shown on the &lt;a href=&quot;%s&quot;&gt;WordPress.org stats page&lt;/a&gt;.&#39; ), &#39;https://wordpress.org/about/stats/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: https://wordpress.org/about/privacy/ */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;We take privacy and transparency very seriously. To learn more about what data we collect, and how we use it, please visit &lt;a href=&quot;%s&quot;&gt;WordPress.org/about/privacy&lt;/a&gt;.&#39; ), &#39;https://wordpress.org/about/privacy/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php else : ?&gt;<br/>
+&lt;div class=&quot;about&ndash;wrap&ndash;content&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;feature&ndash;section has&ndash;1&ndash;columns&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h2&gt;&lt;?php _e( &#39;Freedoms&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;about&ndash;description&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: https://wordpress.org/about/license/ */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;WordPress is Free and open source software, built by a distributed community of mostly volunteer developers from around the world. WordPress comes with some awesome, worldview&ndash;changing rights courtesy of its &lt;a href=&quot;%s&quot;&gt;license&lt;/a&gt;, the GPL.&#39; ), &#39;https://wordpress.org/about/license/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;feature&ndash;section has&ndash;4&ndash;columns is&ndash;fullwidth&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;column&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;freedoms&ndash;image&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h3&gt;&lt;?php _e( &#39;The 1st Freedom&#39; ); ?&gt;&lt;/h3&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;To run the program for any purpose.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;column&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;freedoms&ndash;image&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h3&gt;&lt;?php _e( &#39;The 2nd Freedom&#39; ); ?&gt;&lt;/h3&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;To study how the program works and change it to make it do what you wish.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;column&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;freedoms&ndash;image&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h3&gt;&lt;?php _e( &#39;The 3rd Freedom&#39; ); ?&gt;&lt;/h3&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;To redistribute.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;column&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;freedoms&ndash;image&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h3&gt;&lt;?php _e( &#39;The 4th Freedom&#39; ); ?&gt;&lt;/h3&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;To distribute copies of your modified versions to others.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;feature&ndash;section has&ndash;1&ndash;columns&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: https://wordpressfoundation.org/trademark&ndash;policy/ */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;WordPress grows when people like you tell their friends about it, and the thousands of businesses and services that are built on and around WordPress share that fact with their users. We&amp;#8217;re flattered every time someone spreads the good word, just make sure to &lt;a href=&quot;%s&quot;&gt;check out our trademark guidelines&lt;/a&gt; first.&#39; ), &#39;https://wordpressfoundation.org/trademark&ndash;policy/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$plugins_url = current_user_can( &#39;activate_plugins&#39; ) ? admin_url( &#39;plugins.php&#39; ) : __( &#39;https://wordpress.org/plugins/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$themes_url  = current_user_can( &#39;switch_themes&#39; ) ? admin_url( &#39;themes.php&#39; ) : __( &#39;https://wordpress.org/themes/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: https://wordpress.org/about/license/ */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Every plugin and theme in WordPress.org&amp;#8217;s directory is 100%% GPL or a similarly free and compatible license, so you can feel safe finding &lt;a href=&quot;%1$s&quot;&gt;plugins&lt;/a&gt; and &lt;a href=&quot;%2$s&quot;&gt;themes&lt;/a&gt; there. If you get a plugin or theme from another source, make sure to &lt;a href=&quot;%3$s&quot;&gt;ask them if it&amp;#8217;s GPL&lt;/a&gt; first. If they don&amp;#8217;t respect the WordPress license, we don&amp;#8217;t recommend them.&#39; ), $plugins_url, $themes_url, &#39;https://wordpress.org/about/license/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Don&amp;#8217;t you wish all software came with these freedoms? So do we! For more information, check out the &lt;a href=&quot;https://www.fsf.org/&quot;&gt;Free Software Foundation&lt;/a&gt;.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php endif; ?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;?php include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; ); ?&gt;</body></html>

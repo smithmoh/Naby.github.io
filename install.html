@@ -1,0 +1,440 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Installer<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+// Sanity check.<br/>
+if ( false ) {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;!DOCTYPE html&gt;<br/>
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;<br/>
+&lt;head&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta http&ndash;equiv=&quot;Content&ndash;Type&quot; content=&quot;text/html; charset=utf&ndash;8&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;title&gt;Error: PHP is not running&lt;/title&gt;<br/>
+&lt;/head&gt;<br/>
+&lt;body class=&quot;wp&ndash;core&ndash;ui&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;logo&quot;&gt;&lt;a href=&quot;https://wordpress.org/&quot;&gt;WordPress&lt;/a&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h1&gt;Error: PHP is not running&lt;/h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;WordPress requires that your web server is running PHP. Your server does not have PHP installed, or PHP is turned off.&lt;/p&gt;<br/>
+&lt;/body&gt;<br/>
+&lt;/html&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * We are installing WordPress.<br/>
+ *<br/>
+ * @since 1.5.1<br/>
+ * @var bool<br/>
+ */<br/>
+define( &#39;WP_INSTALLING&#39;, true );<br/>
+<br/>
+/** Load WordPress Bootstrap */<br/>
+require_once( dirname( dirname( __FILE__ ) ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+/** Load WordPress Administration Upgrade API */<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/upgrade.php&#39; );<br/>
+<br/>
+/** Load WordPress Translation Install API */<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/translation&ndash;install.php&#39; );<br/>
+<br/>
+/** Load wpdb */<br/>
+require_once( ABSPATH . WPINC . &#39;/wp&ndash;db.php&#39; );<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+$step = isset( $_GET[&#39;step&#39;] ) ? (int) $_GET[&#39;step&#39;] : 0;<br/>
+<br/>
+/**<br/>
+ * Display installation header.<br/>
+ *<br/>
+ * @since 2.5.0<br/>
+ *<br/>
+ * @param string $body_classes<br/>
+ */<br/>
+function display_header( $body_classes = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;header( &#39;Content&ndash;Type: text/html; charset=utf&ndash;8&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( is_rtl() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$body_classes .= &#39;rtl&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $body_classes ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$body_classes = &#39; &#39; . $body_classes;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;!DOCTYPE html&gt;<br/>
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; &lt;?php language_attributes(); ?&gt;&gt;<br/>
+&lt;head&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta name=&quot;viewport&quot; content=&quot;width=device&ndash;width&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta http&ndash;equiv=&quot;Content&ndash;Type&quot; content=&quot;text/html; charset=utf&ndash;8&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta name=&quot;robots&quot; content=&quot;noindex,nofollow&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;title&gt;&lt;?php _e( &#39;WordPress &amp;rsaquo; Installation&#39; ); ?&gt;&lt;/title&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php wp_admin_css( &#39;install&#39;, true ); ?&gt;<br/>
+&lt;/head&gt;<br/>
+&lt;body class=&quot;wp&ndash;core&ndash;ui&lt;?php echo $body_classes; ?&gt;&quot;&gt;<br/>
+&lt;p id=&quot;logo&quot;&gt;&lt;a href=&quot;&lt;?php echo esc_url( __( &#39;https://wordpress.org/&#39; ) ); ?&gt;&quot;&gt;&lt;?php _e( &#39;WordPress&#39; ); ?&gt;&lt;/a&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+} // end display_header()<br/>
+<br/>
+/**<br/>
+ * Display installer setup form.<br/>
+ *<br/>
+ * @since 2.8.0<br/>
+ *<br/>
+ * @global wpdb $wpdb WordPress database abstraction object.<br/>
+ *<br/>
+ * @param string|null $error<br/>
+ */<br/>
+function display_setup_form( $error = null ) {<br/>
+&nbsp;&nbsp;&nbsp;global $wpdb;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$sql        = $wpdb&ndash;&gt;prepare( &#39;SHOW TABLES LIKE %s&#39;, $wpdb&ndash;&gt;esc_like( $wpdb&ndash;&gt;users ) );<br/>
+&nbsp;&nbsp;&nbsp;$user_table = ( $wpdb&ndash;&gt;get_var( $sql ) != null );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Ensure that Blogs appear in search engines by default.<br/>
+&nbsp;&nbsp;&nbsp;$blog_public = 1;<br/>
+&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;weblog_title&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_public = isset( $_POST[&#39;blog_public&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$weblog_title = isset( $_POST[&#39;weblog_title&#39;] ) ? trim( wp_unslash( $_POST[&#39;weblog_title&#39;] ) ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$user_name    = isset( $_POST[&#39;user_name&#39;] ) ? trim( wp_unslash( $_POST[&#39;user_name&#39;] ) ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$admin_email  = isset( $_POST[&#39;admin_email&#39;] ) ? trim( wp_unslash( $_POST[&#39;admin_email&#39;] ) ) : &#39;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_null( $error ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;h1&gt;&lt;?php _ex( &#39;Welcome&#39;, &#39;Howdy&#39; ); ?&gt;&lt;/h1&gt;<br/>
+&lt;p class=&quot;message&quot;&gt;&lt;?php echo $error; ?&gt;&lt;/p&gt;<br/>
+&lt;?php } ?&gt;<br/>
+&lt;form id=&quot;setup&quot; method=&quot;post&quot; action=&quot;install.php?step=2&quot; novalidate=&quot;novalidate&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;table class=&quot;form&ndash;table&quot; role=&quot;presentation&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;label for=&quot;weblog_title&quot;&gt;&lt;?php _e( &#39;Site Title&#39; ); ?&gt;&lt;/label&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;&lt;input name=&quot;weblog_title&quot; type=&quot;text&quot; id=&quot;weblog_title&quot; size=&quot;25&quot; value=&quot;&lt;?php echo esc_attr( $weblog_title ); ?&gt;&quot; /&gt;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;label for=&quot;user_login&quot;&gt;&lt;?php _e( &#39;Username&#39; ); ?&gt;&lt;/label&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $user_table ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;User(s) already exists.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;input name=&quot;user_name&quot; type=&quot;hidden&quot; value=&quot;admin&quot; /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input name=&quot;user_name&quot; type=&quot;text&quot; id=&quot;user_login&quot; size=&quot;25&quot; value=&quot;&lt;?php echo esc_attr( sanitize_user( $user_name, true ) ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Usernames can have only alphanumeric characters, spaces, underscores, hyphens, periods, and the @ symbol.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( ! $user_table ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr class=&quot;form&ndash;field form&ndash;required user&ndash;pass1&ndash;wrap&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;pass1&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;Password&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;wp&ndash;pwd&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php $initial_password = isset( $_POST[&#39;admin_password&#39;] ) ? stripslashes( $_POST[&#39;admin_password&#39;] ) : wp_generate_password( 18 ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;password&quot; name=&quot;admin_password&quot; id=&quot;pass1&quot; class=&quot;regular&ndash;text&quot; autocomplete=&quot;off&quot; data&ndash;reveal=&quot;1&quot; data&ndash;pw=&quot;&lt;?php echo esc_attr( $initial_password ); ?&gt;&quot; aria&ndash;describedby=&quot;pass&ndash;strength&ndash;result&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;button wp&ndash;hide&ndash;pw hide&ndash;if&ndash;no&ndash;js&quot; data&ndash;start&ndash;masked=&quot;&lt;?php echo (int) isset( $_POST[&#39;admin_password&#39;] ); ?&gt;&quot; data&ndash;toggle=&quot;0&quot; aria&ndash;label=&quot;&lt;?php esc_attr_e( &#39;Hide password&#39; ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;dashicons dashicons&ndash;hidden&quot;&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;text&quot;&gt;&lt;?php _e( &#39;Hide&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;pass&ndash;strength&ndash;result&quot; aria&ndash;live=&quot;polite&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;span class=&quot;description important hide&ndash;if&ndash;no&ndash;js&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;strong&gt;&lt;?php _e( &#39;Important:&#39; ); ?&gt;&lt;/strong&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php /* translators: The non&ndash;breaking space prevents 1Password from thinking the text &quot;log in&quot; should trigger a password save prompt. */ ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;You will need this password to log&amp;nbsp;in. Please store it in a secure location.&#39; ); ?&gt;&lt;/span&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr class=&quot;form&ndash;field form&ndash;required user&ndash;pass2&ndash;wrap hide&ndash;if&ndash;js&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;pass2&quot;&gt;&lt;?php _e( &#39;Repeat Password&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;description&quot;&gt;&lt;?php _e( &#39;(required)&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input name=&quot;admin_password2&quot; type=&quot;password&quot; id=&quot;pass2&quot; autocomplete=&quot;off&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr class=&quot;pw&ndash;weak&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Confirm Password&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;checkbox&quot; name=&quot;pw_weak&quot; class=&quot;pw&ndash;checkbox&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;Confirm use of weak password&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;label for=&quot;admin_email&quot;&gt;&lt;?php _e( &#39;Your Email&#39; ); ?&gt;&lt;/label&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;&lt;input name=&quot;admin_email&quot; type=&quot;email&quot; id=&quot;admin_email&quot; size=&quot;25&quot; value=&quot;&lt;?php echo esc_attr( $admin_email ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Double&ndash;check your email address before continuing.&#39; ); ?&gt;&lt;/p&gt;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;?php has_action( &#39;blog_privacy_selector&#39; ) ? _e( &#39;Site Visibility&#39; ) : _e( &#39;Search Engine Visibility&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;span&gt;&lt;?php has_action( &#39;blog_privacy_selector&#39; ) ? _e( &#39;Site Visibility&#39; ) : _e( &#39;Search Engine Visibility&#39; ); ?&gt; &lt;/span&gt;&lt;/legend&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( has_action( &#39;blog_privacy_selector&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;blog&ndash;public&quot; type=&quot;radio&quot; name=&quot;blog_public&quot; value=&quot;1&quot; &lt;?php checked( 1, $blog_public ); ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;blog&ndash;public&quot;&gt;&lt;?php _e( &#39;Allow search engines to index this site&#39; ); ?&gt;&lt;/label&gt;&lt;br/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;blog&ndash;norobots&quot; type=&quot;radio&quot; name=&quot;blog_public&quot; value=&quot;0&quot; &lt;?php checked( 0, $blog_public ); ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;blog&ndash;norobots&quot;&gt;&lt;?php _e( &#39;Discourage search engines from indexing this site&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;description&quot;&gt;&lt;?php _e( &#39;Note: Neither of these options blocks access to your site &amp;mdash; it is up to search engines to honor your request.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;admin/options&ndash;reading.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;blog_privacy_selector&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;blog_public&quot;&gt;&lt;input name=&quot;blog_public&quot; type=&quot;checkbox&quot; id=&quot;blog_public&quot; value=&quot;0&quot; &lt;?php checked( 0, $blog_public ); ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;Discourage search engines from indexing this site&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;description&quot;&gt;&lt;?php _e( &#39;It is up to search engines to honor this request.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/table&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;step&quot;&gt;&lt;?php submit_button( __( &#39;Install WordPress&#39; ), &#39;large&#39;, &#39;Submit&#39;, false, array( &#39;id&#39; =&gt; &#39;submit&#39; ) ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;language&quot; value=&quot;&lt;?php echo isset( $_REQUEST[&#39;language&#39;] ) ? esc_attr( $_REQUEST[&#39;language&#39;] ) : &#39;&#39;; ?&gt;&quot; /&gt;<br/>
+&lt;/form&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+} // end display_setup_form()<br/>
+<br/>
+// Let&#39;s check to make sure WP isn&#39;t already installed.<br/>
+if ( is_blog_installed() ) {<br/>
+&nbsp;&nbsp;&nbsp;display_header();<br/>
+&nbsp;&nbsp;&nbsp;die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Already Installed&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;You appear to have already installed WordPress. To reinstall please clear your old database tables first.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p class=&quot;step&quot;&gt;&lt;a href=&quot;&#39; . esc_url( wp_login_url() ) . &#39;&quot; class=&quot;button button&ndash;large&quot;&gt;&#39; . __( &#39;Log In&#39; ) . &#39;&lt;/a&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;/body&gt;&lt;/html&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global string $wp_version<br/>
+ * @global string $required_php_version<br/>
+ * @global string $required_mysql_version<br/>
+ */<br/>
+global $wp_version, $required_php_version, $required_mysql_version;<br/>
+<br/>
+$php_version   = phpversion();<br/>
+$mysql_version = $wpdb&ndash;&gt;db_version();<br/>
+$php_compat    = version_compare( $php_version, $required_php_version, &#39;&gt;=&#39; );<br/>
+$mysql_compat  = version_compare( $mysql_version, $required_mysql_version, &#39;&gt;=&#39; ) || file_exists( WP_CONTENT_DIR . &#39;/db.php&#39; );<br/>
+<br/>
+$version_url = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: WordPress version */<br/>
+&nbsp;&nbsp;&nbsp;esc_url( __( &#39;https://wordpress.org/support/wordpress&ndash;version/version&ndash;%s/&#39; ) ),<br/>
+&nbsp;&nbsp;&nbsp;sanitize_title( $wp_version )<br/>
+);<br/>
+<br/>
+/* translators: %s: Update PHP page URL */<br/>
+$php_update_message = &#39;&lt;/p&gt;&lt;p&gt;&#39; . sprintf( __( &#39;&lt;a href=&quot;%s&quot;&gt;Learn more about updating PHP&lt;/a&gt;.&#39; ), esc_url( wp_get_update_php_url() ) );<br/>
+<br/>
+$annotation = wp_get_update_php_annotation();<br/>
+if ( $annotation ) {<br/>
+&nbsp;&nbsp;&nbsp;$php_update_message .= &#39;&lt;/p&gt;&lt;p&gt;&lt;em&gt;&#39; . $annotation . &#39;&lt;/em&gt;&#39;;<br/>
+}<br/>
+<br/>
+if ( ! $mysql_compat &amp;&amp; ! $php_compat ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: 1: URL to WordPress release notes, 2: WordPress version number, 3: Minimum required PHP version number, 4: Minimum required MySQL version number, 5: Current PHP version number, 6: Current MySQL version number */<br/>
+&nbsp;&nbsp;&nbsp;$compat = sprintf( __( &#39;You cannot install because &lt;a href=&quot;%1$s&quot;&gt;WordPress %2$s&lt;/a&gt; requires PHP version %3$s or higher and MySQL version %4$s or higher. You are running PHP version %5$s and MySQL version %6$s.&#39; ), $version_url, $wp_version, $required_php_version, $required_mysql_version, $php_version, $mysql_version ) . $php_update_message;<br/>
+} elseif ( ! $php_compat ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: 1: URL to WordPress release notes, 2: WordPress version number, 3: Minimum required PHP version number, 4: Current PHP version number */<br/>
+&nbsp;&nbsp;&nbsp;$compat = sprintf( __( &#39;You cannot install because &lt;a href=&quot;%1$s&quot;&gt;WordPress %2$s&lt;/a&gt; requires PHP version %3$s or higher. You are running version %4$s.&#39; ), $version_url, $wp_version, $required_php_version, $php_version ) . $php_update_message;<br/>
+} elseif ( ! $mysql_compat ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: 1: URL to WordPress release notes, 2: WordPress version number, 3: Minimum required MySQL version number, 4: Current MySQL version number */<br/>
+&nbsp;&nbsp;&nbsp;$compat = sprintf( __( &#39;You cannot install because &lt;a href=&quot;%1$s&quot;&gt;WordPress %2$s&lt;/a&gt; requires MySQL version %3$s or higher. You are running version %4$s.&#39; ), $version_url, $wp_version, $required_mysql_version, $mysql_version );<br/>
+}<br/>
+<br/>
+if ( ! $mysql_compat || ! $php_compat ) {<br/>
+&nbsp;&nbsp;&nbsp;display_header();<br/>
+&nbsp;&nbsp;&nbsp;die( &#39;&lt;h1&gt;&#39; . __( &#39;Insufficient Requirements&#39; ) . &#39;&lt;/h1&gt;&lt;p&gt;&#39; . $compat . &#39;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&#39; );<br/>
+}<br/>
+<br/>
+if ( ! is_string( $wpdb&ndash;&gt;base_prefix ) || &#39;&#39; === $wpdb&ndash;&gt;base_prefix ) {<br/>
+&nbsp;&nbsp;&nbsp;display_header();<br/>
+&nbsp;&nbsp;&nbsp;die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Configuration Error&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: wp&ndash;config.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Your %s file has an empty database table prefix, which is not supported.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;code&gt;wp&ndash;config.php&lt;/code&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+// Set error message if DO_NOT_UPGRADE_GLOBAL_TABLES isn&#39;t set as it will break install.<br/>
+if ( defined( &#39;DO_NOT_UPGRADE_GLOBAL_TABLES&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;display_header();<br/>
+&nbsp;&nbsp;&nbsp;die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Configuration Error&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: DO_NOT_UPGRADE_GLOBAL_TABLES */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;The constant %s cannot be defined when installing WordPress.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;code&gt;DO_NOT_UPGRADE_GLOBAL_TABLES&lt;/code&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global string    $wp_local_package<br/>
+ * @global WP_Locale $wp_locale<br/>
+ */<br/>
+$language = &#39;&#39;;<br/>
+if ( ! empty( $_REQUEST[&#39;language&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$language = preg_replace( &#39;/[^a&ndash;zA&ndash;Z0&ndash;9_]/&#39;, &#39;&#39;, $_REQUEST[&#39;language&#39;] );<br/>
+} elseif ( isset( $GLOBALS[&#39;wp_local_package&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$language = $GLOBALS[&#39;wp_local_package&#39;];<br/>
+}<br/>
+<br/>
+$scripts_to_print = array( &#39;jquery&#39; );<br/>
+<br/>
+switch ( $step ) {<br/>
+&nbsp;&nbsp;&nbsp;case 0: // Step 0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( wp_can_install_language_pack() &amp;&amp; empty( $language ) &amp;&amp; ( $languages = wp_get_available_translations() ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$scripts_to_print[] = &#39;language&ndash;chooser&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_header( &#39;language&ndash;chooser&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;form id=&quot;setup&quot; method=&quot;post&quot; action=&quot;?step=1&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_install_language_form( $languages );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/form&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Deliberately fall through if we can&#39;t reach the translations API.<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case 1: // Step 1, direct link or from language chooser.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $language ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$loaded_language = wp_download_language_pack( $language );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $loaded_language ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;load_default_textdomain( $loaded_language );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$GLOBALS[&#39;wp_locale&#39;] = new WP_Locale();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$scripts_to_print[] = &#39;user&ndash;profile&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_header();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;h1&gt;&lt;?php _ex( &#39;Welcome&#39;, &#39;Howdy&#39; ); ?&gt;&lt;/h1&gt;<br/>
+&lt;p&gt;&lt;?php _e( &#39;Welcome to the famous five&ndash;minute WordPress installation process! Just fill in the information below and you&amp;#8217;ll be on your way to using the most extendable and powerful personal publishing platform in the world.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Information needed&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&lt;p&gt;&lt;?php _e( &#39;Please provide the following information. Don&amp;#8217;t worry, you can always change these settings later.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_setup_form();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;case 2:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $language ) &amp;&amp; load_default_textdomain( $language ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$loaded_language      = $language;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$GLOBALS[&#39;wp_locale&#39;] = new WP_Locale();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$loaded_language = &#39;en_US&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $wpdb&ndash;&gt;error ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( $wpdb&ndash;&gt;error&ndash;&gt;get_error_message() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$scripts_to_print[] = &#39;user&ndash;profile&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_header();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Fill in the data we gathered<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$weblog_title         = isset( $_POST[&#39;weblog_title&#39;] ) ? trim( wp_unslash( $_POST[&#39;weblog_title&#39;] ) ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_name            = isset( $_POST[&#39;user_name&#39;] ) ? trim( wp_unslash( $_POST[&#39;user_name&#39;] ) ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_password       = isset( $_POST[&#39;admin_password&#39;] ) ? wp_unslash( $_POST[&#39;admin_password&#39;] ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_password_check = isset( $_POST[&#39;admin_password2&#39;] ) ? wp_unslash( $_POST[&#39;admin_password2&#39;] ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_email          = isset( $_POST[&#39;admin_email&#39;] ) ? trim( wp_unslash( $_POST[&#39;admin_email&#39;] ) ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$public               = isset( $_POST[&#39;blog_public&#39;] ) ? (int) $_POST[&#39;blog_public&#39;] : 1;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Check email address.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $user_name ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TODO: poka&ndash;yoke<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_setup_form( __( &#39;Please provide a valid username.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $user_name != sanitize_user( $user_name, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_setup_form( __( &#39;The username you provided has invalid characters.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $admin_password != $admin_password_check ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TODO: poka&ndash;yoke<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_setup_form( __( &#39;Your passwords do not match. Please try again.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( empty( $admin_email ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TODO: poka&ndash;yoke<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_setup_form( __( &#39;You must provide an email address.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! is_email( $admin_email ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TODO: poka&ndash;yoke<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;display_setup_form( __( &#39;Sorry, that isn&amp;#8217;t a valid email address. Email addresses look like &lt;code&gt;username@example.com&lt;/code&gt;.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $error === false ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wpdb&ndash;&gt;show_errors();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$result = wp_install( $weblog_title, $user_name, $admin_email, $public, &#39;&#39;, wp_slash( $admin_password ), $loaded_language );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&lt;h1&gt;&lt;?php _e( &#39;Success!&#39; ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&lt;p&gt;&lt;?php _e( &#39;WordPress has been installed. Thank you, and enjoy!&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&lt;table class=&quot;form&ndash;table install&ndash;success&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th&gt;&lt;?php _e( &#39;Username&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;&lt;?php echo esc_html( sanitize_user( $user_name, true ) ); ?&gt;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;th&gt;&lt;?php _e( &#39;Password&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $result[&#39;password&#39;] ) &amp;&amp; empty( $admin_password_check ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;code&gt;&lt;?php echo esc_html( $result[&#39;password&#39;] ); ?&gt;&lt;/code&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php echo $result[&#39;password_message&#39;]; ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&lt;/table&gt;<br/>
+<br/>
+&lt;p class=&quot;step&quot;&gt;&lt;a href=&quot;&lt;?php echo esc_url( wp_login_url() ); ?&gt;&quot; class=&quot;button button&ndash;large&quot;&gt;&lt;?php _e( &#39;Log In&#39; ); ?&gt;&lt;/a&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+}<br/>
+<br/>
+if ( ! wp_is_mobile() ) {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;var t = document.getElementById(&#39;weblog_title&#39;); if (t){ t.focus(); }&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+wp_print_scripts( $scripts_to_print );<br/>
+?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+jQuery( function( $ ) {<br/>
+&nbsp;&nbsp;&nbsp;$( &#39;.hide&ndash;if&ndash;no&ndash;js&#39; ).removeClass( &#39;hide&ndash;if&ndash;no&ndash;js&#39; );<br/>
+} );<br/>
+&lt;/script&gt;<br/>
+&lt;/body&gt;<br/>
+&lt;/html&gt;</body></html>

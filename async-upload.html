@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Server&ndash;side file upload handler from wp&ndash;plupload or other asynchronous upload methods.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+if ( isset( $_REQUEST[&#39;action&#39;] ) &amp;&amp; &#39;upload&ndash;attachment&#39; === $_REQUEST[&#39;action&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;DOING_AJAX&#39;, true );<br/>
+}<br/>
+<br/>
+if ( ! defined( &#39;WP_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_ADMIN&#39;, true );<br/>
+}<br/>
+<br/>
+if ( defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;load.php&#39; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( dirname( __FILE__ ) ) . &#39;/wp&ndash;load.php&#39; );<br/>
+}<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin.php&#39; );<br/>
+<br/>
+header( &#39;Content&ndash;Type: text/plain; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+<br/>
+if ( isset( $_REQUEST[&#39;action&#39;] ) &amp;&amp; &#39;upload&ndash;attachment&#39; === $_REQUEST[&#39;action&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;include( ABSPATH . &#39;wp&ndash;admin/includes/ajax&ndash;actions.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;send_nosniff_header();<br/>
+&nbsp;&nbsp;&nbsp;nocache_headers();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_ajax_upload_attachment();<br/>
+&nbsp;&nbsp;&nbsp;die( &#39;0&#39; );<br/>
+}<br/>
+<br/>
+if ( ! current_user_can( &#39;upload_files&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to upload files.&#39; ) );<br/>
+}<br/>
+<br/>
+// just fetch the detail form for that attachment<br/>
+if ( isset( $_REQUEST[&#39;attachment_id&#39;] ) &amp;&amp; ( $id = intval( $_REQUEST[&#39;attachment_id&#39;] ) ) &amp;&amp; $_REQUEST[&#39;fetch&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;$post = get_post( $id );<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;attachment&#39; != $post&ndash;&gt;post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Invalid post type.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_post&#39;, $id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to edit this item.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;switch ( $_REQUEST[&#39;fetch&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 3:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $thumb_url = wp_get_attachment_image_src( $id, &#39;thumbnail&#39;, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;img class=&quot;pinkynail&quot; src=&quot;&#39; . esc_url( $thumb_url[0] ) . &#39;&quot; alt=&quot;&quot; /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;a class=&quot;edit&ndash;attachment&quot; href=&quot;&#39; . esc_url( get_edit_post_link( $id ) ) . &#39;&quot; target=&quot;_blank&quot;&gt;&#39; . _x( &#39;Edit&#39;, &#39;media item&#39; ) . &#39;&lt;/a&gt;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Title shouldn&#39;t ever be empty, but use filename just in case.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file  = get_attached_file( $post&ndash;&gt;ID );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = $post&ndash;&gt;post_title ? $post&ndash;&gt;post_title : wp_basename( $file );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;filename new&quot;&gt;&lt;span class=&quot;title&quot;&gt;&#39; . esc_html( wp_html_excerpt( $title, 60, &#39;&amp;hellip;&#39; ) ) . &#39;&lt;/span&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 2:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_filter( &#39;attachment_fields_to_edit&#39;, &#39;media_single_attachment_fields_to_edit&#39;, 10, 2 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo get_media_item(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$id,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;send&#39;   =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;delete&#39; =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_filter( &#39;attachment_fields_to_edit&#39;, &#39;media_post_single_attachment_fields_to_edit&#39;, 10, 2 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo get_media_item( $id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+check_admin_referer( &#39;media&ndash;form&#39; );<br/>
+<br/>
+$post_id = 0;<br/>
+if ( isset( $_REQUEST[&#39;post_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$post_id = absint( $_REQUEST[&#39;post_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! get_post( $post_id ) || ! current_user_can( &#39;edit_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_id = 0;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+$id = media_handle_upload( &#39;async&ndash;upload&#39;, $post_id );<br/>
+if ( is_wp_error( $id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;error&ndash;div error&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;dismiss button&ndash;link&quot; onclick=&quot;jQuery(this).parents(\&#39;div.media&ndash;item\&#39;).slideUp(200, function(){jQuery(this).remove();});&quot;&gt;&#39; . __( &#39;Dismiss&#39; ) . &#39;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;strong&gt;&#39; . sprintf( __( &#39;&amp;#8220;%s&amp;#8221; has failed to upload.&#39; ), esc_html( $_FILES[&#39;async&ndash;upload&#39;][&#39;name&#39;] ) ) . &#39;&lt;/strong&gt;&lt;br /&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;esc_html( $id&ndash;&gt;get_error_message() ) . &#39;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+if ( $_REQUEST[&#39;short&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;// Short form response &ndash; attachment ID only.<br/>
+&nbsp;&nbsp;&nbsp;echo $id;<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;// Long form response &ndash; big chunk of html.<br/>
+&nbsp;&nbsp;&nbsp;$type = $_REQUEST[&#39;type&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the returned ID of an uploaded attachment.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$type`, refers to the attachment type,<br/>
+&nbsp;&nbsp;&nbsp; * such as &#39;image&#39;, &#39;audio&#39;, &#39;video&#39;, &#39;file&#39;, etc.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param int $id Uploaded attachment ID.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;echo apply_filters( &quot;async_upload_{$type}&quot;, $id );<br/>
+}</body></html>

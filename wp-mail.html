@@ -1,0 +1,269 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Gets the email message from the user&#39;s mailbox to add as<br/>
+ * a WordPress post. Mailbox connection information must be<br/>
+ * configured under Settings &gt; Writing<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+/** Make sure that the WordPress bootstrap has run before continuing. */<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+/** This filter is documented in wp&ndash;admin/options.php */<br/>
+if ( ! apply_filters( &#39;enable_post_by_email_configuration&#39;, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;This action has been disabled by the administrator.&#39; ), 403 );<br/>
+}<br/>
+<br/>
+$mailserver_url = get_option( &#39;mailserver_url&#39; );<br/>
+<br/>
+if ( &#39;mail.example.com&#39; === $mailserver_url || empty( $mailserver_url ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;This action has been disabled by the administrator.&#39; ), 403 );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Fires to allow a plugin to do a complete takeover of Post by Email.<br/>
+ *<br/>
+ * @since 2.9.0<br/>
+ */<br/>
+do_action( &#39;wp&ndash;mail.php&#39; );<br/>
+<br/>
+/** Get the POP3 class with which to access the mailbox. */<br/>
+require_once( ABSPATH . WPINC . &#39;/class&ndash;pop3.php&#39; );<br/>
+<br/>
+/** Only check at this interval for new messages. */<br/>
+if ( ! defined( &#39;WP_MAIL_INTERVAL&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_MAIL_INTERVAL&#39;, 300 ); // 5 minutes<br/>
+}<br/>
+<br/>
+$last_checked = get_transient( &#39;mailserver_last_checked&#39; );<br/>
+<br/>
+if ( $last_checked ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Slow down cowboy, no need to check for new mails so often!&#39; ) );<br/>
+}<br/>
+<br/>
+set_transient( &#39;mailserver_last_checked&#39;, true, WP_MAIL_INTERVAL );<br/>
+<br/>
+$time_difference = get_option( &#39;gmt_offset&#39; ) * HOUR_IN_SECONDS;<br/>
+<br/>
+$phone_delim = &#39;::&#39;;<br/>
+<br/>
+$pop3 = new POP3();<br/>
+<br/>
+if ( ! $pop3&ndash;&gt;connect( get_option( &#39;mailserver_url&#39; ), get_option( &#39;mailserver_port&#39; ) ) || ! $pop3&ndash;&gt;user( get_option( &#39;mailserver_login&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( esc_html( $pop3&ndash;&gt;ERROR ) );<br/>
+}<br/>
+<br/>
+$count = $pop3&ndash;&gt;pass( get_option( &#39;mailserver_pass&#39; ) );<br/>
+<br/>
+if ( false === $count ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( esc_html( $pop3&ndash;&gt;ERROR ) );<br/>
+}<br/>
+<br/>
+if ( 0 === $count ) {<br/>
+&nbsp;&nbsp;&nbsp;$pop3&ndash;&gt;quit();<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;There doesn&amp;#8217;t seem to be any new mail.&#39; ) );<br/>
+}<br/>
+<br/>
+for ( $i = 1; $i &lt;= $count; $i++ ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$message = $pop3&ndash;&gt;get( $i );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$bodysignal                = false;<br/>
+&nbsp;&nbsp;&nbsp;$boundary                  = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$charset                   = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$content                   = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$content_type              = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$content_transfer_encoding = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$post_author               = 1;<br/>
+&nbsp;&nbsp;&nbsp;$author_found              = false;<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $message as $line ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Body signal.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( strlen( $line ) &lt; 3 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$bodysignal = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $bodysignal ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content .= $line;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;/Content&ndash;Type: /i&#39;, $line ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_type = trim( $line );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_type = substr( $content_type, 14, strlen( $content_type ) &ndash; 14 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_type = explode( &#39;;&#39;, $content_type );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $content_type[1] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$charset = explode( &#39;=&#39;, $content_type[1] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$charset = ( ! empty( $charset[1] ) ) ? trim( $charset[1] ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_type = $content_type[0];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;/Content&ndash;Transfer&ndash;Encoding: /i&#39;, $line ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_transfer_encoding = trim( $line );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_transfer_encoding = substr( $content_transfer_encoding, 27, strlen( $content_transfer_encoding ) &ndash; 27 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_transfer_encoding = explode( &#39;;&#39;, $content_transfer_encoding );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content_transfer_encoding = $content_transfer_encoding[0];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $content_type == &#39;multipart/alternative&#39; ) &amp;&amp; ( false !== strpos( $line, &#39;boundary=&quot;&#39; ) ) &amp;&amp; ( &#39;&#39; == $boundary ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$boundary = trim( $line );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$boundary = explode( &#39;&quot;&#39;, $boundary );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$boundary = $boundary[1];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;/Subject: /i&#39;, $line ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$subject = trim( $line );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$subject = substr( $subject, 9, strlen( $subject ) &ndash; 9 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Captures any text in the subject before $phone_delim as the subject<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( function_exists( &#39;iconv_mime_decode&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$subject = iconv_mime_decode( $subject, 2, get_option( &#39;blog_charset&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$subject = wp_iso_descrambler( $subject );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$subject = explode( $phone_delim, $subject );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$subject = $subject[0];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Set the author using the email address (From or Reply&ndash;To, the last used)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * otherwise use the site admin.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $author_found &amp;&amp; preg_match( &#39;/^(From|Reply&ndash;To): /&#39;, $line ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;|[a&ndash;z0&ndash;9_.&ndash;]+@[a&ndash;z0&ndash;9_.&ndash;]+(?!.*&lt;)|i&#39;, $line, $matches ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$author = $matches[0];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$author = trim( $line );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$author = sanitize_email( $author );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_email( $author ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: Post author email address */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p&gt;&#39; . sprintf( __( &#39;Author is %s&#39; ), $author ) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$userdata = get_user_by( &#39;email&#39;, $author );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $userdata ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_author  = $userdata&ndash;&gt;ID;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$author_found = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;/Date: /i&#39;, $line ) ) { // of the form &#39;20 Mar 2002 20:32:37 +0100&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ddate         = str_replace( &#39;Date: &#39;, &#39;&#39;, trim( $line ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ddate         = preg_replace( &#39;!\s*\(.+\)\s*$!&#39;, &#39;&#39;, $ddate ); // remove parenthesised timezone string if it exists, as this confuses strtotime<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ddate_U       = strtotime( $ddate );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_date     = gmdate( &#39;Y&ndash;m&ndash;d H:i:s&#39;, $ddate_U + $time_difference );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_date_gmt = gmdate( &#39;Y&ndash;m&ndash;d H:i:s&#39;, $ddate_U );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Set $post_status based on $author_found and on author&#39;s publish_posts capability<br/>
+&nbsp;&nbsp;&nbsp;if ( $author_found ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user        = new WP_User( $post_author );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_status = ( $user&ndash;&gt;has_cap( &#39;publish_posts&#39; ) ) ? &#39;publish&#39; : &#39;pending&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Author not found in DB, set status to pending. Author already set to admin.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_status = &#39;pending&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$subject = trim( $subject );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $content_type == &#39;multipart/alternative&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = explode( &#39;&ndash;&ndash;&#39; . $boundary, $content );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = $content[2];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Match case&ndash;insensitive content&ndash;transfer&ndash;encoding.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;/Content&ndash;Transfer&ndash;Encoding: quoted&ndash;printable/i&#39;, $content, $delim ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = explode( $delim[0], $content );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = $content[1];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = strip_tags( $content, &#39;&lt;img&gt;&lt;p&gt;&lt;br&gt;&lt;i&gt;&lt;b&gt;&lt;u&gt;&lt;em&gt;&lt;strong&gt;&lt;strike&gt;&lt;font&gt;&lt;span&gt;&lt;div&gt;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;$content = trim( $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the original content of the email.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Give Post&ndash;By&ndash;Email extending plugins full access to the content, either<br/>
+&nbsp;&nbsp;&nbsp; * the raw content, or the content of the last quoted&ndash;printable section.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.8.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $content The original email content.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$content = apply_filters( &#39;wp_mail_original_content&#39;, $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( false !== stripos( $content_transfer_encoding, &#39;quoted&ndash;printable&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = quoted_printable_decode( $content );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( function_exists( &#39;iconv&#39; ) &amp;&amp; ! empty( $charset ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = iconv( $charset, get_option( &#39;blog_charset&#39; ), $content );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Captures any text in the body after $phone_delim as the body<br/>
+&nbsp;&nbsp;&nbsp;$content = explode( $phone_delim, $content );<br/>
+&nbsp;&nbsp;&nbsp;$content = empty( $content[1] ) ? $content[0] : $content[1];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$content = trim( $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the content of the post submitted by email before saving.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 1.2.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $content The email content.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$post_content = apply_filters( &#39;phone_content&#39;, $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$post_title = xmlrpc_getposttitle( $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $post_title == &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_title = $subject;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$post_category = array( get_option( &#39;default_email_category&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$post_data = compact( &#39;post_content&#39;, &#39;post_title&#39;, &#39;post_date&#39;, &#39;post_date_gmt&#39;, &#39;post_author&#39;, &#39;post_category&#39;, &#39;post_status&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$post_data = wp_slash( $post_data );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$post_ID = wp_insert_post( $post_data );<br/>
+&nbsp;&nbsp;&nbsp;if ( is_wp_error( $post_ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;\n&quot; . $post_ID&ndash;&gt;get_error_message();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// We couldn&#39;t post, for whatever reason. Better move forward to the next email.<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $post_ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires after a post submitted by email is published.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 1.2.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param int $post_ID The post ID.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;publish_phone&#39;, $post_ID );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;echo &quot;\n&lt;p&gt;&lt;strong&gt;&quot; . __( &#39;Author:&#39; ) . &#39;&lt;/strong&gt; &#39; . esc_html( $post_author ) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;echo &quot;\n&lt;p&gt;&lt;strong&gt;&quot; . __( &#39;Posted title:&#39; ) . &#39;&lt;/strong&gt; &#39; . esc_html( $post_title ) . &#39;&lt;/p&gt;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $pop3&ndash;&gt;delete( $i ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: POP3 error */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Oops: %s&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;esc_html( $pop3&ndash;&gt;ERROR )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$pop3&ndash;&gt;reset();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: the message ID */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Mission complete. Message %s deleted.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . $i . &#39;&lt;/strong&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+$pop3&ndash;&gt;quit();</body></html>

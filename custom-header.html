@@ -1,0 +1,1508 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * The custom header image script.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * The custom header image class.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+class Custom_Image_Header {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Callback for administration header.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @var callable<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public $admin_header_callback;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Callback for header div.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @var callable<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public $admin_image_div_callback;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Holds default headers.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @var array<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public $default_headers = array();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Used to trigger a success message when settings updated and set to true.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; * @var bool<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;private $updated;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Constructor &ndash; Register administration header callback.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; * @param callable $admin_header_callback<br/>
+&nbsp;&nbsp;&nbsp; * @param callable $admin_image_div_callback Optional custom image div output callback.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function __construct( $admin_header_callback, $admin_image_div_callback = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;admin_header_callback    = $admin_header_callback;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;admin_image_div_callback = $admin_image_div_callback;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;admin_menu&#39;, array( $this, &#39;init&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;customize_save_after&#39;, array( $this, &#39;customize_set_last_used&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_custom&ndash;header&ndash;crop&#39;, array( $this, &#39;ajax_header_crop&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_custom&ndash;header&ndash;add&#39;, array( $this, &#39;ajax_header_add&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_custom&ndash;header&ndash;remove&#39;, array( $this, &#39;ajax_header_remove&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Set up the hooks for the Custom Header admin page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function init() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$page = add_theme_page( __( &#39;Header&#39; ), __( &#39;Header&#39; ), &#39;edit_theme_options&#39;, &#39;custom&ndash;header&#39;, array( $this, &#39;admin_page&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $page ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_print_scripts&ndash;$page&quot;, array( $this, &#39;js_includes&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_print_styles&ndash;$page&quot;, array( $this, &#39;css_includes&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_head&ndash;$page&quot;, array( $this, &#39;help&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_head&ndash;$page&quot;, array( $this, &#39;take_action&#39; ), 50 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_head&ndash;$page&quot;, array( $this, &#39;js&#39; ), 50 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $this&ndash;&gt;admin_header_callback ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_head&ndash;$page&quot;, $this&ndash;&gt;admin_header_callback, 51 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Adds contextual help.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function help() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;This screen is used to customize the header section of your theme.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;You can choose from the theme&amp;#8217;s default header images, or use one of your own. You can also customize how your Site Title and Tagline are displayed.&#39; ) . &#39;&lt;p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;set&ndash;header&ndash;image&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Header Image&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;You can set a custom image header for your site. Simply upload the image and crop it, and the new header will go live immediately. Alternatively, you can use an image that has already been uploaded to your Media Library by clicking the &amp;#8220;Choose Image&amp;#8221; button.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Some themes come with additional header images bundled. If you see multiple images displayed, select the one you&amp;#8217;d like and click the &amp;#8220;Save Changes&amp;#8221; button.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;If your theme has more than one default header image, or you have uploaded more than one custom header image, you have the option of having WordPress display a randomly different image on each page of your site. Click the &amp;#8220;Random&amp;#8221; radio button next to the Uploaded Images or Default Images section to enable this feature.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;If you don&amp;#8217;t want a header image to be displayed on your site at all, click the &amp;#8220;Remove Header Image&amp;#8221; button at the bottom of the Header Image section of this page. If you want to re&ndash;enable the header image later, you just have to select one of the other image options and click &amp;#8220;Save Changes&amp;#8221;.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;set&ndash;header&ndash;text&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Header Text&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . sprintf( __( &#39;For most themes, the header text is your Site Title and Tagline, as defined in the &lt;a href=&quot;%1$s&quot;&gt;General Settings&lt;/a&gt; section.&#39; ), admin_url( &#39;options&ndash;general.php&#39; ) ) . &#39;&lt;p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;In the Header Text section of this page, you can choose whether to display this text or hide it. You can also choose a color for the text by clicking the Select Color button and either typing in a legitimate HTML hex value, e.g. &amp;#8220;#ff0000&amp;#8221; for red, or by choosing a color using the color picker.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Don&amp;#8217;t forget to click &amp;#8220;Save Changes&amp;#8221; when you&amp;#8217;re done!&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Appearance_Header_Screen&quot;&gt;Documentation on Custom Header&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Get the current step.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @return int Current step<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function step() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;step&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return 1;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$step = (int) $_GET[&#39;step&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $step &lt; 1 || 3 &lt; $step ||<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( 2 == $step &amp;&amp; ! wp_verify_nonce( $_REQUEST[&#39;_wpnonce&ndash;custom&ndash;header&ndash;upload&#39;], &#39;custom&ndash;header&ndash;upload&#39; ) ) ||<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( 3 == $step &amp;&amp; ! wp_verify_nonce( $_REQUEST[&#39;_wpnonce&#39;], &#39;custom&ndash;header&ndash;crop&ndash;image&#39; ) )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return 1;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $step;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Set up the enqueue for the JavaScript files.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function js_includes() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$step = $this&ndash;&gt;step();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( 1 == $step || 3 == $step ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_media();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;custom&ndash;header&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;header&ndash;text&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;wp&ndash;color&ndash;picker&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( 2 == $step ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;imgareaselect&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Set up the enqueue for the CSS files<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.7.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function css_includes() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$step = $this&ndash;&gt;step();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( 1 == $step || 3 == $step ) &amp;&amp; current_theme_supports( &#39;custom&ndash;header&#39;, &#39;header&ndash;text&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_style( &#39;wp&ndash;color&ndash;picker&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( 2 == $step ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_style( &#39;imgareaselect&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Execute custom header modification.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function take_action() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_POST ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;updated = true;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;resetheader&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;options&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;options&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;reset_header_image();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;removeheader&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;options&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;options&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;remove_header_image();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;text&ndash;color&#39;] ) &amp;&amp; ! isset( $_POST[&#39;display&ndash;header&ndash;text&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;options&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;options&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_textcolor&#39;, &#39;blank&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_POST[&#39;text&ndash;color&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;options&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;options&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$_POST[&#39;text&ndash;color&#39;] = str_replace( &#39;#&#39;, &#39;&#39;, $_POST[&#39;text&ndash;color&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$color               = preg_replace( &#39;/[^0&ndash;9a&ndash;fA&ndash;F]/&#39;, &#39;&#39;, $_POST[&#39;text&ndash;color&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( strlen( $color ) == 6 || strlen( $color ) == 3 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_textcolor&#39;, $color );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! $color ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_textcolor&#39;, &#39;blank&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;default&ndash;header&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;options&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;options&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;set_header_image( $_POST[&#39;default&ndash;header&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Process the default headers<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @global array $_wp_default_headers<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function process_default_headers() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;global $_wp_default_headers;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_wp_default_headers ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $this&ndash;&gt;default_headers ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;default_headers    = $_wp_default_headers;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$template_directory_uri   = get_template_directory_uri();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$stylesheet_directory_uri = get_stylesheet_directory_uri();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( array_keys( $this&ndash;&gt;default_headers ) as $header ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;default_headers[ $header ][&#39;url&#39;]           = sprintf( $this&ndash;&gt;default_headers[ $header ][&#39;url&#39;], $template_directory_uri, $stylesheet_directory_uri );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;default_headers[ $header ][&#39;thumbnail_url&#39;] = sprintf( $this&ndash;&gt;default_headers[ $header ][&#39;thumbnail_url&#39;], $template_directory_uri, $stylesheet_directory_uri );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display UI for selecting one of several default headers.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Show the random image option if this theme has multiple header images.<br/>
+&nbsp;&nbsp;&nbsp; * Random image option is on by default if no header has been set.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $type The header type. One of &#39;default&#39; (for the Uploaded Images control)<br/>
+&nbsp;&nbsp;&nbsp; *                     or &#39;uploaded&#39; (for the Uploaded Images control).<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function show_header_selector( $type = &#39;default&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;default&#39; == $type ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$headers = $this&ndash;&gt;default_headers;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$headers = get_uploaded_header_images();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$type    = &#39;uploaded&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( 1 &lt; count( $headers ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;random&ndash;header&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;label&gt;&lt;input name=&quot;default&ndash;header&quot; type=&quot;radio&quot; value=&quot;random&ndash;&#39; . $type . &#39;&ndash;image&quot;&#39; . checked( is_random_header_image( $type ), true, false ) . &#39; /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;&lt;strong&gt;Random:&lt;/strong&gt; Show a different image on each page.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/label&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;available&ndash;headers&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $headers as $header_key =&gt; $header ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_thumbnail = $header[&#39;thumbnail_url&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_url       = $header[&#39;url&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_alt_text  = empty( $header[&#39;alt_text&#39;] ) ? &#39;&#39; : $header[&#39;alt_text&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;default&ndash;header&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;label&gt;&lt;input name=&quot;default&ndash;header&quot; type=&quot;radio&quot; value=&quot;&#39; . esc_attr( $header_key ) . &#39;&quot; &#39; . checked( $header_url, get_theme_mod( &#39;header_image&#39; ), false ) . &#39; /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$width = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $header[&#39;attachment_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$width = &#39; width=&quot;230&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;img src=&quot;&#39; . set_url_scheme( $header_thumbnail ) . &#39;&quot; alt=&quot;&#39; . esc_attr( $header_alt_text ) . &#39;&quot;&#39; . $width . &#39; /&gt;&lt;/label&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Execute JavaScript depending on step.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function js() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$step = $this&ndash;&gt;step();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( 1 == $step || 3 == $step ) &amp;&amp; current_theme_supports( &#39;custom&ndash;header&#39;, &#39;header&ndash;text&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;js_1();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( 2 == $step ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;js_2();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display JavaScript based on Step 1 and 3.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function js_1() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;default&ndash;text&ndash;color&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = get_theme_support( &#39;custom&ndash;header&#39;, &#39;default&ndash;text&ndash;color&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $default_color &amp;&amp; false === strpos( $default_color, &#39;#&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = &#39;#&#39; . $default_color;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+(function($){<br/>
+&nbsp;&nbsp;&nbsp;var default_color = &#39;&lt;?php echo esc_js( $default_color ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;header_text_fields;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;function pickColor(color) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$(&#39;#name&#39;).css(&#39;color&#39;, color);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$(&#39;#desc&#39;).css(&#39;color&#39;, color);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$(&#39;#text&ndash;color&#39;).val(color);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;function toggle_text() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var checked = $(&#39;#display&ndash;header&ndash;text&#39;).prop(&#39;checked&#39;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text_color;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;header_text_fields.toggle( checked );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! checked )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text_color = $(&#39;#text&ndash;color&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;&#39; == text_color.val().replace(&#39;#&#39;, &#39;&#39;) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text_color.val( default_color );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pickColor( default_color );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pickColor( text_color.val() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$(document).ready(function() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var text_color = $(&#39;#text&ndash;color&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;header_text_fields = $(&#39;.displaying&ndash;header&ndash;text&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text_color.wpColorPicker({<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;change: function( event, ui ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pickColor( text_color.wpColorPicker(&#39;color&#39;) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clear: function() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pickColor( &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$(&#39;#display&ndash;header&ndash;text&#39;).click( toggle_text );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( ! display_header_text() ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;toggle_text();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;});<br/>
+})(jQuery);<br/>
+&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display JavaScript based on Step 2.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function js_2() {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;function onEndCrop( coords ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery( &#39;#x1&#39; ).val(coords.x);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery( &#39;#y1&#39; ).val(coords.y);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery( &#39;#width&#39; ).val(coords.w);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery( &#39;#height&#39; ).val(coords.h);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;jQuery(document).ready(function() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var xinit = &lt;?php echo absint( get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; ) ); ?&gt;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var yinit = &lt;?php echo absint( get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; ) ); ?&gt;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var ratio = xinit / yinit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var ximg = jQuery(&#39;img#upload&#39;).width();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var yimg = jQuery(&#39;img#upload&#39;).height();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( yimg &lt; yinit || ximg &lt; xinit ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ximg / yimg &gt; ratio ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yinit = yimg;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xinit = yinit * ratio;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xinit = ximg;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yinit = xinit / ratio;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;img#upload&#39;).imgAreaSelect({<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;handles: true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;keys: true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;show: true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x1: 0,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;y1: 0,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x2: xinit,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;y2: yinit,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) &amp;&amp; ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aspectRatio: xinit + &#39;:&#39; + yinit,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;maxHeight: &lt;?php echo get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; ); ?&gt;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;maxWidth: &lt;?php echo get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; ); ?&gt;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;onInit: function () {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;#width&#39;).val(xinit);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;#height&#39;).val(yinit);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;onSelectChange: function(img, c) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;#x1&#39;).val(c.x1);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;#y1&#39;).val(c.y1);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;#width&#39;).val(c.width);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jQuery(&#39;#height&#39;).val(c.height);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});<br/>
+&nbsp;&nbsp;&nbsp;});<br/>
+&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display first step of custom header image page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function step_1() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;process_default_headers();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1&gt;&lt;?php _e( &#39;Custom Header&#39; ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( current_user_can( &#39;customize&#39; ) ) { ?&gt;<br/>
+&lt;div class=&quot;notice notice&ndash;info hide&ndash;if&ndash;no&ndash;customize&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;You can now manage and live&ndash;preview Custom Header in the &lt;a href=&quot;%1$s&quot;&gt;Customizer&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admin_url( &#39;customize.php?autofocus[control]=header_image&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( ! empty( $this&ndash;&gt;updated ) ) { ?&gt;<br/>
+&lt;div id=&quot;message&quot; class=&quot;updated&quot;&gt;<br/>
+&lt;p&gt;&lt;?php printf( __( &#39;Header updated. &lt;a href=&quot;%s&quot;&gt;Visit your site&lt;/a&gt; to see how it looks.&#39; ), home_url( &#39;/&#39; ) ); ?&gt;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Header Image&#39; ); ?&gt;&lt;/h2&gt;<br/>
+<br/>
+&lt;table class=&quot;form&ndash;table&quot; role=&quot;presentation&quot;&gt;<br/>
+&lt;tbody&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( get_custom_header() || display_header_text() ) : ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Preview&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $this&ndash;&gt;admin_image_div_callback ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;call_user_func( $this&ndash;&gt;admin_image_div_callback );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$custom_header = get_custom_header();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image  = get_header_image();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $header_image ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_style = &#39;background&ndash;image:url(&#39; . esc_url( $header_image ) . &#39;);&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_style = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $custom_header&ndash;&gt;width ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_style .= &#39;max&ndash;width:&#39; . $custom_header&ndash;&gt;width . &#39;px;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $custom_header&ndash;&gt;height ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_style .= &#39;height:&#39; . $custom_header&ndash;&gt;height . &#39;px;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;headimg&quot; style=&quot;&lt;?php echo $header_image_style; ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( display_header_text() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$style = &#39; style=&quot;color:#&#39; . get_header_textcolor() . &#39;;&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$style = &#39; style=&quot;display:none;&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h1&gt;&lt;a id=&quot;name&quot; class=&quot;displaying&ndash;header&ndash;text&quot; &lt;?php echo $style; ?&gt; onclick=&quot;return false;&quot; href=&quot;&lt;?php bloginfo( &#39;url&#39; ); ?&gt;&quot; tabindex=&quot;&ndash;1&quot;&gt;&lt;?php bloginfo( &#39;name&#39; ); ?&gt;&lt;/a&gt;&lt;/h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;desc&quot; class=&quot;displaying&ndash;header&ndash;text&quot; &lt;?php echo $style; ?&gt;&gt;&lt;?php bloginfo( &#39;description&#39; ); ?&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( current_user_can( &#39;upload_files&#39; ) &amp;&amp; current_theme_supports( &#39;custom&ndash;header&#39;, &#39;uploads&#39; ) ) : ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Select Image&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;You can select an image to be shown at the top of your site by uploading from your computer or choosing from your media library. After selecting an image you will be able to crop it.&#39; ); ?&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) &amp;&amp; ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Images of exactly &lt;strong&gt;%1$d &amp;times; %2$d pixels&lt;/strong&gt; will be used as&ndash;is.&#39; ) . &#39;&lt;br /&gt;&#39;, get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; ), get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: size in pixels */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Images should be at least %s wide.&#39; ) . &#39; &#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %d: custom header width */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . __( &#39;%d pixels&#39; ) . &#39;&lt;/strong&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: size in pixels */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Images should be at least %s tall.&#39; ) . &#39; &#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %d: custom header height */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . __( &#39;%d pixels&#39; ) . &#39;&lt;/strong&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) || current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: size in pixels */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Suggested width is %s.&#39; ) . &#39; &#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %d: custom header width */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . __( &#39;%d pixels&#39; ) . &#39;&lt;/strong&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;height&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: size in pixels */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Suggested height is %s.&#39; ) . &#39; &#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %d: custom header height */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . __( &#39;%d pixels&#39; ) . &#39;&lt;/strong&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form enctype=&quot;multipart/form&ndash;data&quot; id=&quot;upload&ndash;form&quot; class=&quot;wp&ndash;upload&ndash;form&quot; method=&quot;post&quot; action=&quot;&lt;?php echo esc_url( add_query_arg( &#39;step&#39;, 2 ) ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;upload&quot;&gt;&lt;?php _e( &#39;Choose an image from your computer:&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;file&quot; id=&quot;upload&quot; name=&quot;import&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;save&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;custom&ndash;header&ndash;upload&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;upload&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Upload&#39; ), &#39;&#39;, &#39;submit&#39;, false ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$modal_update_href = esc_url(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_query_arg(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;page&#39; =&gt; &#39;custom&ndash;header&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;step&#39; =&gt; 2,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;_wpnonce&ndash;custom&ndash;header&ndash;upload&#39; =&gt; wp_create_nonce( &#39;custom&ndash;header&ndash;upload&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admin_url( &#39;themes.php&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;choose&ndash;from&ndash;library&ndash;link&quot;&gt;&lt;?php _e( &#39;Or choose an image from your media library:&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button id=&quot;choose&ndash;from&ndash;library&ndash;link&quot; class=&quot;button&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data&ndash;update&ndash;link=&quot;&lt;?php echo esc_attr( $modal_update_href ); ?&gt;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data&ndash;choose=&quot;&lt;?php esc_attr_e( &#39;Choose a Custom Header&#39; ); ?&gt;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data&ndash;update=&quot;&lt;?php esc_attr_e( &#39;Set as header&#39; ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Choose Image&#39; ); ?&gt;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&lt;/tbody&gt;<br/>
+&lt;/table&gt;<br/>
+<br/>
+&lt;form method=&quot;post&quot; action=&quot;&lt;?php echo esc_url( add_query_arg( &#39;step&#39;, 1 ) ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( null, &#39;screen&ndash;reader&ndash;text&#39;, &#39;save&ndash;header&ndash;options&#39;, false ); ?&gt;<br/>
+&lt;table class=&quot;form&ndash;table&quot; role=&quot;presentation&quot;&gt;<br/>
+&lt;tbody&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( get_uploaded_header_images() ) : ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Uploaded Images&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;You can choose one of your previously uploaded headers, or show a random one.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;show_header_selector( &#39;uploaded&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;endif;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $this&ndash;&gt;default_headers ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Default Images&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;uploads&#39; ) ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;If you don&amp;lsquo;t want to upload your own image, you can use one of these cool headers, or show a random one.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php else : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;You can use one of these cool headers or show a random one on each page.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;show_header_selector( &#39;default&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;endif;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( get_header_image() ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Remove Image&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;This will remove the header image. You will not be able to restore any customizations.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Remove Header Image&#39; ), &#39;&#39;, &#39;removeheader&#39;, false ); ?&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;endif;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_image = sprintf( get_theme_support( &#39;custom&ndash;header&#39;, &#39;default&ndash;image&#39; ), get_template_directory_uri(), get_stylesheet_directory_uri() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $default_image &amp;&amp; get_header_image() != $default_image ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Reset Image&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;This will restore the original header image. You will not be able to restore any customizations.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Restore Original Header Image&#39; ), &#39;&#39;, &#39;resetheader&#39;, false ); ?&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&lt;/tbody&gt;<br/>
+&lt;/table&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;header&ndash;text&#39; ) ) : ?&gt;<br/>
+<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Header Text&#39; ); ?&gt;&lt;/h2&gt;<br/>
+<br/>
+&lt;table class=&quot;form&ndash;table&quot; role=&quot;presentation&quot;&gt;<br/>
+&lt;tbody&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Header Text&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;label&gt;&lt;input type=&quot;checkbox&quot; name=&quot;display&ndash;header&ndash;text&quot; id=&quot;display&ndash;header&ndash;text&quot;&lt;?php checked( display_header_text() ); ?&gt; /&gt; &lt;?php _e( &#39;Show header text with your image.&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+<br/>
+&lt;tr class=&quot;displaying&ndash;header&ndash;text&quot;&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Text Color&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;default&ndash;text&ndash;color&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = get_theme_support( &#39;custom&ndash;header&#39;, &#39;default&ndash;text&ndash;color&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $default_color &amp;&amp; false === strpos( $default_color, &#39;#&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = &#39;#&#39; . $default_color;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color_attr = $default_color ? &#39; data&ndash;default&ndash;color=&quot;&#39; . esc_attr( $default_color ) . &#39;&quot;&#39; : &#39;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_textcolor = display_header_text() ? get_header_textcolor() : get_theme_support( &#39;custom&ndash;header&#39;, &#39;default&ndash;text&ndash;color&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $header_textcolor &amp;&amp; false === strpos( $header_textcolor, &#39;#&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_textcolor = &#39;#&#39; . $header_textcolor;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;input type=&quot;text&quot; name=&quot;text&ndash;color&quot; id=&quot;text&ndash;color&quot; value=&quot;&#39; . esc_attr( $header_textcolor ) . &#39;&quot;&#39; . $default_color_attr . &#39; /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $default_color ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39; &lt;span class=&quot;description hide&ndash;if&ndash;js&quot;&gt;&#39; . sprintf( _x( &#39;Default: %s&#39;, &#39;color&#39; ), esc_html( $default_color ) ) . &#39;&lt;/span&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;/tbody&gt;<br/>
+&lt;/table&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+endif;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires just before the submit button in the custom header options form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;custom_header_options&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_nonce_field( &#39;custom&ndash;header&ndash;options&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;options&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( null, &#39;primary&#39;, &#39;save&ndash;header&ndash;options&#39; ); ?&gt;<br/>
+&lt;/form&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display second step of custom header image page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function step_2() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;upload&#39;, &#39;_wpnonce&ndash;custom&ndash;header&ndash;upload&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;uploads&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Something went wrong.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;The current theme does not support uploading a custom header image.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_POST ) &amp;&amp; isset( $_GET[&#39;file&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_GET[&#39;file&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file          = get_attached_file( $attachment_id, true );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url           = wp_get_attachment_image_src( $attachment_id, &#39;full&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url           = $url[0];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_POST ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$data          = $this&ndash;&gt;step_2_manage_upload();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = $data[&#39;attachment_id&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file          = $data[&#39;file&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url           = $data[&#39;url&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( file_exists( $file ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;list( $width, $height, $type, $attr ) = getimagesize( $file );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$data   = wp_get_attachment_metadata( $attachment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$height = isset( $data[&#39;height&#39;] ) ? $data[&#39;height&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$width  = isset( $data[&#39;width&#39;] ) ? $data[&#39;width&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $data );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// For flex, limit size of image displayed to 1500px unless theme says otherwise<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = 1500;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;max&ndash;width&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = max( $max_width, get_theme_support( &#39;custom&ndash;header&#39;, &#39;max&ndash;width&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = max( $max_width, get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If flexible height isn&#39;t supported and the image is the exact right size<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) &amp;&amp; ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&amp;&amp; $width == get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; ) &amp;&amp; $height == get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Add the meta&ndash;data<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( file_exists( $file ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_update_attachment_metadata( $attachment_id, wp_generate_attachment_metadata( $attachment_id, $file ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;set_header_image( compact( &#39;url&#39;, &#39;attachment_id&#39;, &#39;width&#39;, &#39;height&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires after the header image is set or an error is returned.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $file          Path to the file.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param int    $attachment_id Attachment ID.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;wp_create_file_in_uploads&#39;, $file, $attachment_id ); // For replication<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $this&ndash;&gt;finished();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $width &gt; $max_width ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$oitar = $width / $max_width;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$image = wp_crop_image( $attachment_id, 0, 0, $width, $height, $max_width, $height / $oitar, false, str_replace( wp_basename( $file ), &#39;midsize&ndash;&#39; . wp_basename( $file ), $file ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $image || is_wp_error( $image ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Image could not be processed. Please go back and try again.&#39; ), __( &#39;Image Processing Error&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/custom&ndash;header.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$image = apply_filters( &#39;wp_create_file_in_uploads&#39;, $image, $attachment_id ); // For replication<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url    = str_replace( wp_basename( $url ), wp_basename( $image ), $url );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$width  = $width / $oitar;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$height = $height / $oitar;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$oitar = 1;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1&gt;&lt;?php _e( &#39;Crop Header Image&#39; ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&lt;form method=&quot;post&quot; action=&quot;&lt;?php echo esc_url( add_query_arg( &#39;step&#39;, 3 ) ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;hide&ndash;if&ndash;no&ndash;js&quot;&gt;&lt;?php _e( &#39;Choose the part of the image you want to use as your header.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;hide&ndash;if&ndash;js&quot;&gt;&lt;strong&gt;&lt;?php _e( &#39;You need JavaScript to choose a part of the image.&#39; ); ?&gt;&lt;/strong&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;crop_image&quot; style=&quot;position: relative&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;img src=&quot;&lt;?php echo esc_url( $url ); ?&gt;&quot; id=&quot;upload&quot; width=&quot;&lt;?php echo $width; ?&gt;&quot; height=&quot;&lt;?php echo $height; ?&gt;&quot; alt=&quot;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;x1&quot; id=&quot;x1&quot; value=&quot;0&quot;/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;y1&quot; id=&quot;y1&quot; value=&quot;0&quot;/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;width&quot; id=&quot;width&quot; value=&quot;&lt;?php echo esc_attr( $width ); ?&gt;&quot;/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;height&quot; id=&quot;height&quot; value=&quot;&lt;?php echo esc_attr( $height ); ?&gt;&quot;/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;attachment_id&quot; id=&quot;attachment_id&quot; value=&quot;&lt;?php echo esc_attr( $attachment_id ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;oitar&quot; id=&quot;oitar&quot; value=&quot;&lt;?php echo esc_attr( $oitar ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( empty( $_POST ) &amp;&amp; isset( $_GET[&#39;file&#39;] ) ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;create&ndash;new&ndash;attachment&quot; value=&quot;true&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;custom&ndash;header&ndash;crop&ndash;image&#39; ); ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Crop and Publish&#39; ), &#39;primary&#39;, &#39;submit&#39;, false ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $oitar ) &amp;&amp; 1 == $oitar &amp;&amp; ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) || current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;submit_button( __( &#39;Skip Cropping, Publish Image as Is&#39; ), &#39;&#39;, &#39;skip&ndash;cropping&#39;, false );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&lt;/form&gt;<br/>
+&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Upload the file to be cropped in the second step.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function step_2_manage_upload() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$overrides = array( &#39;test_form&#39; =&gt; false );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$uploaded_file = $_FILES[&#39;import&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wp_filetype   = wp_check_filetype_and_ext( $uploaded_file[&#39;tmp_name&#39;], $uploaded_file[&#39;name&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! wp_match_mime_types( &#39;image&#39;, $wp_filetype[&#39;type&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;The uploaded file is not a valid image. Please try again.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file = wp_handle_upload( $uploaded_file, $overrides );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $file[&#39;error&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( $file[&#39;error&#39;], __( &#39;Image Upload Error&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url      = $file[&#39;url&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$type     = $file[&#39;type&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file     = $file[&#39;file&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$filename = wp_basename( $file );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Construct the object array<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_title&#39;     =&gt; $filename,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_content&#39;   =&gt; $url,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_mime_type&#39; =&gt; $type,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;guid&#39;           =&gt; $url,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;context&#39;        =&gt; &#39;custom&ndash;header&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Save the data<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = wp_insert_attachment( $object, $file );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return compact( &#39;attachment_id&#39;, &#39;file&#39;, &#39;filename&#39;, &#39;url&#39;, &#39;type&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display third step of custom header image page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.4.0 Switched to using wp_get_attachment_url() instead of the guid<br/>
+&nbsp;&nbsp;&nbsp; *              for retrieving the header image URL.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function step_3() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;header&ndash;crop&ndash;image&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;uploads&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Something went wrong.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;The current theme does not support uploading a custom header image.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $_POST[&#39;skip&ndash;cropping&#39;] ) &amp;&amp; ! ( current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; ) || current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Something went wrong.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;The current theme does not support a flexible sized header image.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_POST[&#39;oitar&#39;] &gt; 1 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$_POST[&#39;x1&#39;]     = $_POST[&#39;x1&#39;] * $_POST[&#39;oitar&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$_POST[&#39;y1&#39;]     = $_POST[&#39;y1&#39;] * $_POST[&#39;oitar&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$_POST[&#39;width&#39;]  = $_POST[&#39;width&#39;] * $_POST[&#39;oitar&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$_POST[&#39;height&#39;] = $_POST[&#39;height&#39;] * $_POST[&#39;oitar&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_POST[&#39;attachment_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$original      = get_attached_file( $attachment_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dimensions = $this&ndash;&gt;get_header_dimensions(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;height&#39; =&gt; $_POST[&#39;height&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;width&#39;  =&gt; $_POST[&#39;width&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$height     = $dimensions[&#39;dst_height&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$width      = $dimensions[&#39;dst_width&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_POST[&#39;skip&ndash;cropping&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cropped = wp_crop_image( $attachment_id, (int) $_POST[&#39;x1&#39;], (int) $_POST[&#39;y1&#39;], (int) $_POST[&#39;width&#39;], (int) $_POST[&#39;height&#39;], $width, $height );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! empty( $_POST[&#39;create&ndash;new&ndash;attachment&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cropped = _copy_image_file( $attachment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cropped = get_attached_file( $attachment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $cropped || is_wp_error( $cropped ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Image could not be processed. Please go back and try again.&#39; ), __( &#39;Image Processing Error&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/custom&ndash;header.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cropped = apply_filters( &#39;wp_create_file_in_uploads&#39;, $cropped, $attachment_id ); // For replication<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object = $this&ndash;&gt;create_attachment_object( $cropped, $attachment_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $_POST[&#39;create&ndash;new&ndash;attachment&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $object[&#39;ID&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Update the attachment<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = $this&ndash;&gt;insert_attachment( $object, $cropped );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url = wp_get_attachment_url( $attachment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;set_header_image( compact( &#39;url&#39;, &#39;attachment_id&#39;, &#39;width&#39;, &#39;height&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Cleanup.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$medium = str_replace( wp_basename( $original ), &#39;midsize&ndash;&#39; . wp_basename( $original ), $original );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( file_exists( $medium ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_delete_file( $medium );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_POST[&#39;create&ndash;new&ndash;attachment&#39;] ) &amp;&amp; empty( $_POST[&#39;skip&ndash;cropping&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_delete_file( $original );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $this&ndash;&gt;finished();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display last step of custom header image page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function finished() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;updated = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;step_1();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display the page based on the current step.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function admin_page() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to customize headers.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$step = $this&ndash;&gt;step();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( 2 == $step ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;step_2();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( 3 == $step ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;step_3();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;step_1();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Unused since 3.5.0.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $form_fields<br/>
+&nbsp;&nbsp;&nbsp; * @return array $form_fields<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function attachment_fields_to_edit( $form_fields ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $form_fields;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Unused since 3.5.0.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $tabs<br/>
+&nbsp;&nbsp;&nbsp; * @return array $tabs<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function filter_upload_tabs( $tabs ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $tabs;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Choose a header image, selected from existing uploaded and default headers,<br/>
+&nbsp;&nbsp;&nbsp; * or provide an array of uploaded header data (either new, or from media library).<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param mixed $choice Which header image to select. Allows for values of &#39;random&ndash;default&ndash;image&#39;,<br/>
+&nbsp;&nbsp;&nbsp; *  for randomly cycling among the default images; &#39;random&ndash;uploaded&ndash;image&#39;, for randomly cycling<br/>
+&nbsp;&nbsp;&nbsp; *  among the uploaded images; the key of a default image registered for that theme; and<br/>
+&nbsp;&nbsp;&nbsp; *  the key of an image uploaded for that theme (the attachment ID of the image).<br/>
+&nbsp;&nbsp;&nbsp; *  Or an array of arguments: attachment_id, url, width, height. All are required.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;final public function set_header_image( $choice ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_array( $choice ) || is_object( $choice ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$choice = (array) $choice;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $choice[&#39;attachment_id&#39;] ) || ! isset( $choice[&#39;url&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$choice[&#39;url&#39;] = esc_url_raw( $choice[&#39;url&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_data = (object) array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;attachment_id&#39; =&gt; $choice[&#39;attachment_id&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;url&#39;           =&gt; $choice[&#39;url&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;thumbnail_url&#39; =&gt; $choice[&#39;url&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;height&#39;        =&gt; $choice[&#39;height&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;width&#39;         =&gt; $choice[&#39;width&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $choice[&#39;attachment_id&#39;], &#39;_wp_attachment_is_custom_header&#39;, get_stylesheet() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image&#39;, $choice[&#39;url&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image_data&#39;, $header_image_data );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $choice, array( &#39;remove&ndash;header&#39;, &#39;random&ndash;default&ndash;image&#39;, &#39;random&ndash;uploaded&ndash;image&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image&#39;, $choice );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remove_theme_mod( &#39;header_image_data&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$uploaded = get_uploaded_header_images();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $uploaded &amp;&amp; isset( $uploaded[ $choice ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_data = $uploaded[ $choice ];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;process_default_headers();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $this&ndash;&gt;default_headers[ $choice ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_data = $this&ndash;&gt;default_headers[ $choice ];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image&#39;, esc_url_raw( $header_image_data[&#39;url&#39;] ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image_data&#39;, $header_image_data );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Remove a header image.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;final public function remove_header_image() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;set_header_image( &#39;remove&ndash;header&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Reset a header image to the default image for the theme.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * This method does not do anything if the theme does not have a default header image.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;final public function reset_header_image() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;process_default_headers();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default = get_theme_support( &#39;custom&ndash;header&#39;, &#39;default&ndash;image&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $default ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;remove_header_image();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default = sprintf( $default, get_template_directory_uri(), get_stylesheet_directory_uri() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_data = array();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $this&ndash;&gt;default_headers as $header =&gt; $details ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $details[&#39;url&#39;] == $default ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_data = $details;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image&#39;, $default );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;header_image_data&#39;, (object) $default_data );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Calculate width and height based on what the currently selected theme supports.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $dimensions<br/>
+&nbsp;&nbsp;&nbsp; * @return array dst_height and dst_width of header image.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;final public function get_header_dimensions( $dimensions ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width       = 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$width           = absint( $dimensions[&#39;width&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$height          = absint( $dimensions[&#39;height&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$theme_height    = get_theme_support( &#39;custom&ndash;header&#39;, &#39;height&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$theme_width     = get_theme_support( &#39;custom&ndash;header&#39;, &#39;width&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$has_flex_width  = current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;width&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$has_flex_height = current_theme_supports( &#39;custom&ndash;header&#39;, &#39;flex&ndash;height&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$has_max_width   = current_theme_supports( &#39;custom&ndash;header&#39;, &#39;max&ndash;width&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst             = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;dst_height&#39; =&gt; null,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;dst_width&#39;  =&gt; null,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// For flex, limit size of image displayed to 1500px unless theme says otherwise<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $has_flex_width ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = 1500;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $has_max_width ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = max( $max_width, get_theme_support( &#39;custom&ndash;header&#39;, &#39;max&ndash;width&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$max_width = max( $max_width, $theme_width );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $has_flex_height &amp;&amp; ( ! $has_flex_width || $width &gt; $max_width ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst[&#39;dst_height&#39;] = absint( $height * ( $max_width / $width ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $has_flex_height &amp;&amp; $has_flex_width ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst[&#39;dst_height&#39;] = $height;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst[&#39;dst_height&#39;] = $theme_height;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $has_flex_width &amp;&amp; ( ! $has_flex_height || $width &gt; $max_width ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst[&#39;dst_width&#39;] = absint( $width * ( $max_width / $width ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $has_flex_width &amp;&amp; $has_flex_height ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst[&#39;dst_width&#39;] = $width;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dst[&#39;dst_width&#39;] = $theme_width;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $dst;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Create an attachment &#39;object&#39;.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $cropped              Cropped image URL.<br/>
+&nbsp;&nbsp;&nbsp; * @param int    $parent_attachment_id Attachment ID of parent image.<br/>
+&nbsp;&nbsp;&nbsp; * @return array Attachment object.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;final public function create_attachment_object( $cropped, $parent_attachment_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$parent     = get_post( $parent_attachment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$parent_url = wp_get_attachment_url( $parent&ndash;&gt;ID );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url        = str_replace( wp_basename( $parent_url ), wp_basename( $cropped ), $parent_url );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size       = @getimagesize( $cropped );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$image_type = ( $size ) ? $size[&#39;mime&#39;] : &#39;image/jpeg&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;ID&#39;             =&gt; $parent_attachment_id,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_title&#39;     =&gt; wp_basename( $cropped ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_mime_type&#39; =&gt; $image_type,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;guid&#39;           =&gt; $url,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;context&#39;        =&gt; &#39;custom&ndash;header&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_parent&#39;    =&gt; $parent_attachment_id,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $object;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Insert an attachment and its metadata.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array  $object  Attachment object.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $cropped Cropped image URL.<br/>
+&nbsp;&nbsp;&nbsp; * @return int Attachment ID.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;final public function insert_attachment( $object, $cropped ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$parent_id = isset( $object[&#39;post_parent&#39;] ) ? $object[&#39;post_parent&#39;] : null;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $object[&#39;post_parent&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = wp_insert_attachment( $object, $cropped );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$metadata      = wp_generate_attachment_metadata( $attachment_id, $cropped );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If this is a crop, save the original attachment ID as metadata.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $parent_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$metadata[&#39;attachment_parent&#39;] = $parent_id;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the header image attachment metadata.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @see wp_generate_attachment_metadata()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param array $metadata Attachment metadata.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$metadata = apply_filters( &#39;wp_header_image_attachment_metadata&#39;, $metadata );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_update_attachment_metadata( $attachment_id, $metadata );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $attachment_id;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Gets attachment uploaded by Media Manager, crops it, then saves it as a<br/>
+&nbsp;&nbsp;&nbsp; * new object. Returns JSON&ndash;encoded object details.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function ajax_header_crop() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_ajax_referer( &#39;image_editor&ndash;&#39; . $_POST[&#39;id&#39;], &#39;nonce&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_theme_supports( &#39;custom&ndash;header&#39;, &#39;uploads&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$crop_details = $_POST[&#39;cropDetails&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$dimensions = $this&ndash;&gt;get_header_dimensions(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;height&#39; =&gt; $crop_details[&#39;height&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;width&#39;  =&gt; $crop_details[&#39;width&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_POST[&#39;id&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cropped = wp_crop_image(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(int) $crop_details[&#39;x1&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(int) $crop_details[&#39;y1&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(int) $crop_details[&#39;width&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(int) $crop_details[&#39;height&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(int) $dimensions[&#39;dst_width&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(int) $dimensions[&#39;dst_height&#39;]<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $cropped || is_wp_error( $cropped ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error( array( &#39;message&#39; =&gt; __( &#39;Image could not be processed. Please go back and try again.&#39; ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/custom&ndash;header.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cropped = apply_filters( &#39;wp_create_file_in_uploads&#39;, $cropped, $attachment_id ); // For replication<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object = $this&ndash;&gt;create_attachment_object( $cropped, $attachment_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$previous = $this&ndash;&gt;get_previous_crop( $object );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $previous ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object[&#39;ID&#39;] = $previous;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $object[&#39;ID&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$new_attachment_id = $this&ndash;&gt;insert_attachment( $object, $cropped );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object[&#39;attachment_id&#39;] = $new_attachment_id;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object[&#39;url&#39;]           = wp_get_attachment_url( $new_attachment_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object[&#39;width&#39;]  = $dimensions[&#39;dst_width&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object[&#39;height&#39;] = $dimensions[&#39;dst_height&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_success( $object );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Given an attachment ID for a header image, updates its &quot;last used&quot;<br/>
+&nbsp;&nbsp;&nbsp; * timestamp to now.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Triggered when the user tries adds a new header image from the<br/>
+&nbsp;&nbsp;&nbsp; * Media Manager, even if s/he doesn&#39;t save that change.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function ajax_header_add() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_ajax_referer( &#39;header&ndash;add&#39;, &#39;nonce&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_POST[&#39;attachment_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $attachment_id &lt; 1 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$key = &#39;_wp_attachment_custom_header_last_used_&#39; . get_stylesheet();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $attachment_id, $key, time() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $attachment_id, &#39;_wp_attachment_is_custom_header&#39;, get_stylesheet() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_success();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Given an attachment ID for a header image, unsets it as a user&ndash;uploaded<br/>
+&nbsp;&nbsp;&nbsp; * header image for the current theme.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Triggered when the user clicks the overlay &quot;X&quot; button next to each image<br/>
+&nbsp;&nbsp;&nbsp; * choice in the Customizer&#39;s Header tool.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function ajax_header_remove() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_ajax_referer( &#39;header&ndash;remove&#39;, &#39;nonce&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_POST[&#39;attachment_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $attachment_id &lt; 1 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$key = &#39;_wp_attachment_custom_header_last_used_&#39; . get_stylesheet();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;delete_post_meta( $attachment_id, $key );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;delete_post_meta( $attachment_id, &#39;_wp_attachment_is_custom_header&#39;, get_stylesheet() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_success();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Updates the last&ndash;used postmeta on a header image attachment after saving a new header image via the Customizer.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param WP_Customize_Manager $wp_customize Customize manager.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function customize_set_last_used( $wp_customize ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image_data_setting = $wp_customize&ndash;&gt;get_setting( &#39;header_image_data&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $header_image_data_setting ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$data = $header_image_data_setting&ndash;&gt;post_value();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $data[&#39;attachment_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = $data[&#39;attachment_id&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$key           = &#39;_wp_attachment_custom_header_last_used_&#39; . get_stylesheet();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $attachment_id, $key, time() );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Gets the details of default header images if defined.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @return array Default header images.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function get_default_header_images() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;process_default_headers();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Get the default image if there is one.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default = get_theme_support( &#39;custom&ndash;header&#39;, &#39;default&ndash;image&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $default ) { // If not,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $this&ndash;&gt;default_headers; // easy peasy.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default             = sprintf( $default, get_template_directory_uri(), get_stylesheet_directory_uri() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$already_has_default = false;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $this&ndash;&gt;default_headers as $k =&gt; $h ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $h[&#39;url&#39;] === $default ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$already_has_default = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $already_has_default ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $this&ndash;&gt;default_headers;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If the one true image isn&#39;t included in the default set, prepend it.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_images            = array();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_images[&#39;default&#39;] = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;url&#39;           =&gt; $default,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;thumbnail_url&#39; =&gt; $default,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;description&#39;   =&gt; &#39;Default&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// The rest of the set comes after.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return array_merge( $header_images, $this&ndash;&gt;default_headers );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Gets the previously uploaded header images.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @return array Uploaded header images.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function get_uploaded_header_images() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_images = get_uploaded_header_images();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$timestamp_key = &#39;_wp_attachment_custom_header_last_used_&#39; . get_stylesheet();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$alt_text_key  = &#39;_wp_attachment_image_alt&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $header_images as &amp;$header_image ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_meta               = get_post_meta( $header_image[&#39;attachment_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image[&#39;timestamp&#39;] = isset( $header_meta[ $timestamp_key ] ) ? $header_meta[ $timestamp_key ] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_image[&#39;alt_text&#39;]  = isset( $header_meta[ $alt_text_key ] ) ? $header_meta[ $alt_text_key ] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $header_images;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Get the ID of a previous crop from the same base image.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param  array $object A crop attachment object.<br/>
+&nbsp;&nbsp;&nbsp; * @return int|false An attachment ID if one exists. False if none.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function get_previous_crop( $object ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$header_images = $this&ndash;&gt;get_uploaded_header_images();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Bail early if there are no header images.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $header_images ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$previous = false;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $header_images as $image ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $image[&#39;attachment_parent&#39;] === $object[&#39;post_parent&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$previous = $image[&#39;attachment_id&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $previous;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}</body></html>

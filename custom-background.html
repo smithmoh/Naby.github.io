@@ -1,0 +1,613 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * The custom background script.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * The custom background class.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+class Custom_Background {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Callback for administration header.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @var callable<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public $admin_header_callback;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Callback for header div.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @var callable<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public $admin_image_div_callback;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Used to trigger a success message when settings updated and set to true.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; * @var bool<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;private $updated;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Constructor &ndash; Register administration header callback.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; * @param callable $admin_header_callback<br/>
+&nbsp;&nbsp;&nbsp; * @param callable $admin_image_div_callback Optional custom image div output callback.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function __construct( $admin_header_callback = &#39;&#39;, $admin_image_div_callback = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;admin_header_callback    = $admin_header_callback;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;admin_image_div_callback = $admin_image_div_callback;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;admin_menu&#39;, array( $this, &#39;init&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_custom&ndash;background&ndash;add&#39;, array( $this, &#39;ajax_background_add&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Unused since 3.5.0.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_set&ndash;background&ndash;image&#39;, array( $this, &#39;wp_set_background_image&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Set up the hooks for the Custom Background admin page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function init() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$page = add_theme_page( __( &#39;Background&#39; ), __( &#39;Background&#39; ), &#39;edit_theme_options&#39;, &#39;custom&ndash;background&#39;, array( $this, &#39;admin_page&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $page ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;load&ndash;$page&quot;, array( $this, &#39;admin_load&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;load&ndash;$page&quot;, array( $this, &#39;take_action&#39; ), 49 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;load&ndash;$page&quot;, array( $this, &#39;handle_upload&#39; ), 49 );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $this&ndash;&gt;admin_header_callback ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &quot;admin_head&ndash;$page&quot;, $this&ndash;&gt;admin_header_callback, 51 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Set up the enqueue for the CSS &amp; JavaScript files.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function admin_load() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;You can customize the look of your site without touching any of your theme&amp;#8217;s code by using a custom background. Your background can be an image or a color.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;To use a background image, simply upload it or choose an image that has already been uploaded to your Media Library by clicking the &amp;#8220;Choose Image&amp;#8221; button. You can display a single instance of your image, or tile it to fill the screen. You can have your background fixed in place, so your site content moves on top of it, or you can have it scroll with your site.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;You can also choose a background color by clicking the Select Color button and either typing in a legitimate HTML hex value, e.g. &amp;#8220;#ff0000&amp;#8221; for red, or by choosing a color using the color picker.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Don&amp;#8217;t forget to click on the Save Changes button when you are finished.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Appearance_Background_Screen&quot;&gt;Documentation on Custom Background&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_media();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;custom&ndash;background&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_style( &#39;wp&ndash;color&ndash;picker&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Execute custom background modification.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function take_action() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_POST ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;reset&ndash;background&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&ndash;reset&#39;, &#39;_wpnonce&ndash;custom&ndash;background&ndash;reset&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remove_theme_mod( &#39;background_image&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remove_theme_mod( &#39;background_image_thumb&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;updated = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;remove&ndash;background&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// @TODO: Uploaded files are not removed here.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&ndash;remove&#39;, &#39;_wpnonce&ndash;custom&ndash;background&ndash;remove&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_image&#39;, &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_image_thumb&#39;, &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;updated = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( $_POST[&#39;_wp_http_referer&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;background&ndash;preset&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $_POST[&#39;background&ndash;preset&#39;], array( &#39;default&#39;, &#39;fill&#39;, &#39;fit&#39;, &#39;repeat&#39;, &#39;custom&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$preset = $_POST[&#39;background&ndash;preset&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$preset = &#39;default&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_preset&#39;, $preset );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;background&ndash;position&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$position = explode( &#39; &#39;, $_POST[&#39;background&ndash;position&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $position[0], array( &#39;left&#39;, &#39;center&#39;, &#39;right&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$position_x = $position[0];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$position_x = &#39;left&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $position[1], array( &#39;top&#39;, &#39;center&#39;, &#39;bottom&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$position_y = $position[1];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$position_y = &#39;top&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_position_x&#39;, $position_x );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_position_y&#39;, $position_y );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;background&ndash;size&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $_POST[&#39;background&ndash;size&#39;], array( &#39;auto&#39;, &#39;contain&#39;, &#39;cover&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size = $_POST[&#39;background&ndash;size&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size = &#39;auto&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_size&#39;, $size );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;background&ndash;repeat&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$repeat = $_POST[&#39;background&ndash;repeat&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;no&ndash;repeat&#39; !== $repeat ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$repeat = &#39;repeat&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_repeat&#39;, $repeat );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;background&ndash;attachment&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment = $_POST[&#39;background&ndash;attachment&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;fixed&#39; !== $attachment ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment = &#39;scroll&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_attachment&#39;, $attachment );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;background&ndash;color&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$color = preg_replace( &#39;/[^0&ndash;9a&ndash;fA&ndash;F]/&#39;, &#39;&#39;, $_POST[&#39;background&ndash;color&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( strlen( $color ) == 6 || strlen( $color ) == 3 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_color&#39;, $color );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_color&#39;, &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;updated = true;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Display the custom background page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function admin_page() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;div class=&quot;wrap&quot; id=&quot;custom&ndash;background&quot;&gt;<br/>
+&lt;h1&gt;&lt;?php _e( &#39;Custom Background&#39; ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( current_user_can( &#39;customize&#39; ) ) { ?&gt;<br/>
+&lt;div class=&quot;notice notice&ndash;info hide&ndash;if&ndash;no&ndash;customize&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;You can now manage and live&ndash;preview Custom Backgrounds in the &lt;a href=&quot;%1$s&quot;&gt;Customizer&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admin_url( &#39;customize.php?autofocus[control]=background_image&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( ! empty( $this&ndash;&gt;updated ) ) { ?&gt;<br/>
+&lt;div id=&quot;message&quot; class=&quot;updated&quot;&gt;<br/>
+&lt;p&gt;&lt;?php printf( __( &#39;Background updated. &lt;a href=&quot;%s&quot;&gt;Visit your site&lt;/a&gt; to see how it looks.&#39; ), home_url( &#39;/&#39; ) ); ?&gt;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Background Image&#39; ); ?&gt;&lt;/h2&gt;<br/>
+<br/>
+&lt;table class=&quot;form&ndash;table&quot; role=&quot;presentation&quot;&gt;<br/>
+&lt;tbody&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Preview&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $this&ndash;&gt;admin_image_div_callback ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;call_user_func( $this&ndash;&gt;admin_image_div_callback );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_styles = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $bgcolor = get_background_color() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_styles .= &#39;background&ndash;color: #&#39; . $bgcolor . &#39;;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_image_thumb = get_background_image();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $background_image_thumb ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_image_thumb = esc_url( set_url_scheme( get_theme_mod( &#39;background_image_thumb&#39;, str_replace( &#39;%&#39;, &#39;%%&#39;, $background_image_thumb ) ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_position_x  = get_theme_mod( &#39;background_position_x&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;position&ndash;x&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_position_y  = get_theme_mod( &#39;background_position_y&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;position&ndash;y&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_size        = get_theme_mod( &#39;background_size&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;size&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_repeat      = get_theme_mod( &#39;background_repeat&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;repeat&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_attachment  = get_theme_mod( &#39;background_attachment&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;attachment&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Background&ndash;image URL must be single quote, see below.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_styles .= &quot; background&ndash;image: url(&#39;$background_image_thumb&#39;);&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;. &quot; background&ndash;size: $background_size;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;. &quot; background&ndash;position: $background_position_x $background_position_y;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;. &quot; background&ndash;repeat: $background_repeat;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;. &quot; background&ndash;attachment: $background_attachment;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;custom&ndash;background&ndash;image&quot; style=&quot;&lt;?php echo $background_styles; ?&gt;&quot;&gt;&lt;?php // must be double quote, see above ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( $background_image_thumb ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;img class=&quot;custom&ndash;background&ndash;image&quot; src=&quot;&lt;?php echo $background_image_thumb; ?&gt;&quot; style=&quot;visibility:hidden;&quot; alt=&quot;&quot; /&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;img class=&quot;custom&ndash;background&ndash;image&quot; src=&quot;&lt;?php echo $background_image_thumb; ?&gt;&quot; style=&quot;visibility:hidden;&quot; alt=&quot;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( get_background_image() ) : ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Remove Image&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&lt;form method=&quot;post&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;custom&ndash;background&ndash;remove&#39;, &#39;_wpnonce&ndash;custom&ndash;background&ndash;remove&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Remove Background Image&#39; ), &#39;&#39;, &#39;remove&ndash;background&#39;, false ); ?&gt;&lt;br/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;This will remove the background image. You will not be able to restore any customizations.&#39; ); ?&gt;<br/>
+&lt;/form&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php $default_image = get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;image&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( $default_image &amp;&amp; get_background_image() != $default_image ) : ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Restore Original Image&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;<br/>
+&lt;form method=&quot;post&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;custom&ndash;background&ndash;reset&#39;, &#39;_wpnonce&ndash;custom&ndash;background&ndash;reset&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Restore Original Image&#39; ), &#39;&#39;, &#39;reset&ndash;background&#39;, false ); ?&gt;&lt;br/&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;This will restore the original background image. You will not be able to restore any customizations.&#39; ); ?&gt;<br/>
+&lt;/form&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( current_user_can( &#39;upload_files&#39; ) ) : ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Select Image&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;form enctype=&quot;multipart/form&ndash;data&quot; id=&quot;upload&ndash;form&quot; class=&quot;wp&ndash;upload&ndash;form&quot; method=&quot;post&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;upload&quot;&gt;&lt;?php _e( &#39;Choose an image from your computer:&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;file&quot; id=&quot;upload&quot; name=&quot;import&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;save&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;custom&ndash;background&ndash;upload&#39;, &#39;_wpnonce&ndash;custom&ndash;background&ndash;upload&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Upload&#39; ), &#39;&#39;, &#39;submit&#39;, false ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;choose&ndash;from&ndash;library&ndash;link&quot;&gt;&lt;?php _e( &#39;Or choose an image from your media library:&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button id=&quot;choose&ndash;from&ndash;library&ndash;link&quot; class=&quot;button&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data&ndash;choose=&quot;&lt;?php esc_attr_e( &#39;Choose a Background Image&#39; ); ?&gt;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data&ndash;update=&quot;&lt;?php esc_attr_e( &#39;Set as background&#39; ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Choose Image&#39; ); ?&gt;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&lt;/tbody&gt;<br/>
+&lt;/table&gt;<br/>
+<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Display Options&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&lt;form method=&quot;post&quot;&gt;<br/>
+&lt;table class=&quot;form&ndash;table&quot; role=&quot;presentation&quot;&gt;<br/>
+&lt;tbody&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( get_background_image() ) : ?&gt;<br/>
+&lt;input name=&quot;background&ndash;preset&quot; type=&quot;hidden&quot; value=&quot;custom&quot;&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_position = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;%s %s&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_theme_mod( &#39;background_position_x&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;position&ndash;x&#39; ) ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_theme_mod( &#39;background_position_y&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;position&ndash;y&#39; ) )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$background_position_options = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;left top&#39;   =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Top Left&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;left&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;center top&#39; =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Top&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;up&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;right top&#39;  =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Top Right&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;right&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;left center&#39;   =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Left&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;left&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;center center&#39; =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Center&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;background&ndash;position&ndash;center&ndash;icon&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;right center&#39;  =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Right&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;right&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;left bottom&#39;   =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Bottom Left&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;left&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;center bottom&#39; =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Bottom&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;down&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;right bottom&#39;  =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;label&#39; =&gt; __( &#39;Bottom Right&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;icon&#39;  =&gt; &#39;dashicons dashicons&ndash;arrow&ndash;right&ndash;alt&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Image Position&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;fieldset&gt;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;span&gt;&lt;?php _e( &#39;Image Position&#39; ); ?&gt;&lt;/span&gt;&lt;/legend&gt;<br/>
+&lt;div class=&quot;background&ndash;position&ndash;control&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php foreach ( $background_position_options as $group ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;button&ndash;group&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php foreach ( $group as $value =&gt; $input ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input class=&quot;screen&ndash;reader&ndash;text&quot; name=&quot;background&ndash;position&quot; type=&quot;radio&quot; value=&quot;&lt;?php echo esc_attr( $value ); ?&gt;&quot;&lt;?php checked( $value, $background_position ); ?&gt;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;button display&ndash;options position&quot;&gt;&lt;span class=&quot;&lt;?php echo esc_attr( $input[&#39;icon&#39;] ); ?&gt;&quot; aria&ndash;hidden=&quot;true&quot;&gt;&lt;/span&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php echo $input[&#39;label&#39;]; ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php endforeach; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&lt;?php endforeach; ?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/fieldset&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;label for=&quot;background&ndash;size&quot;&gt;&lt;?php _e( &#39;Image Size&#39; ); ?&gt;&lt;/label&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;fieldset&gt;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;span&gt;&lt;?php _e( &#39;Image Size&#39; ); ?&gt;&lt;/span&gt;&lt;/legend&gt;<br/>
+&lt;select id=&quot;background&ndash;size&quot; name=&quot;background&ndash;size&quot;&gt;<br/>
+&lt;option value=&quot;auto&quot;&lt;?php selected( &#39;auto&#39;, get_theme_mod( &#39;background_size&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;size&#39; ) ) ); ?&gt;&gt;&lt;?php _ex( &#39;Original&#39;, &#39;Original Size&#39; ); ?&gt;&lt;/option&gt;<br/>
+&lt;option value=&quot;contain&quot;&lt;?php selected( &#39;contain&#39;, get_theme_mod( &#39;background_size&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;size&#39; ) ) ); ?&gt;&gt;&lt;?php _e( &#39;Fit to Screen&#39; ); ?&gt;&lt;/option&gt;<br/>
+&lt;option value=&quot;cover&quot;&lt;?php selected( &#39;cover&#39;, get_theme_mod( &#39;background_size&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;size&#39; ) ) ); ?&gt;&gt;&lt;?php _e( &#39;Fill Screen&#39; ); ?&gt;&lt;/option&gt;<br/>
+&lt;/select&gt;<br/>
+&lt;/fieldset&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _ex( &#39;Repeat&#39;, &#39;Background Repeat&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;fieldset&gt;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;span&gt;&lt;?php _ex( &#39;Repeat&#39;, &#39;Background Repeat&#39; ); ?&gt;&lt;/span&gt;&lt;/legend&gt;<br/>
+&lt;input name=&quot;background&ndash;repeat&quot; type=&quot;hidden&quot; value=&quot;no&ndash;repeat&quot;&gt;<br/>
+&lt;label&gt;&lt;input type=&quot;checkbox&quot; name=&quot;background&ndash;repeat&quot; value=&quot;repeat&quot;&lt;?php checked( &#39;repeat&#39;, get_theme_mod( &#39;background_repeat&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;repeat&#39; ) ) ); ?&gt;&gt; &lt;?php _e( &#39;Repeat Background Image&#39; ); ?&gt;&lt;/label&gt;<br/>
+&lt;/fieldset&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _ex( &#39;Scroll&#39;, &#39;Background Scroll&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;fieldset&gt;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;span&gt;&lt;?php _ex( &#39;Scroll&#39;, &#39;Background Scroll&#39; ); ?&gt;&lt;/span&gt;&lt;/legend&gt;<br/>
+&lt;input name=&quot;background&ndash;attachment&quot; type=&quot;hidden&quot; value=&quot;fixed&quot;&gt;<br/>
+&lt;label&gt;&lt;input name=&quot;background&ndash;attachment&quot; type=&quot;checkbox&quot; value=&quot;scroll&quot; &lt;?php checked( &#39;scroll&#39;, get_theme_mod( &#39;background_attachment&#39;, get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;attachment&#39; ) ) ); ?&gt;&gt; &lt;?php _e( &#39;Scroll with Page&#39; ); ?&gt;&lt;/label&gt;<br/>
+&lt;/fieldset&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;?php endif; // get_background_image() ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Background Color&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;fieldset&gt;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;span&gt;&lt;?php _e( &#39;Background Color&#39; ); ?&gt;&lt;/span&gt;&lt;/legend&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;custom&ndash;background&#39;, &#39;default&ndash;color&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$default_color = &#39; data&ndash;default&ndash;color=&quot;#&#39; . esc_attr( get_theme_support( &#39;custom&ndash;background&#39;, &#39;default&ndash;color&#39; ) ) . &#39;&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;input type=&quot;text&quot; name=&quot;background&ndash;color&quot; id=&quot;background&ndash;color&quot; value=&quot;#&lt;?php echo esc_attr( get_background_color() ); ?&gt;&quot;&lt;?php echo $default_color; ?&gt;&gt;<br/>
+&lt;/fieldset&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;/tbody&gt;<br/>
+&lt;/table&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;custom&ndash;background&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( null, &#39;primary&#39;, &#39;save&ndash;background&ndash;options&#39; ); ?&gt;<br/>
+&lt;/form&gt;<br/>
+<br/>
+&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Handle an Image upload for the background image.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function handle_upload() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_FILES ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;custom&ndash;background&ndash;upload&#39;, &#39;_wpnonce&ndash;custom&ndash;background&ndash;upload&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$overrides = array( &#39;test_form&#39; =&gt; false );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$uploaded_file = $_FILES[&#39;import&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wp_filetype   = wp_check_filetype_and_ext( $uploaded_file[&#39;tmp_name&#39;], $uploaded_file[&#39;name&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! wp_match_mime_types( &#39;image&#39;, $wp_filetype[&#39;type&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;The uploaded file is not a valid image. Please try again.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file = wp_handle_upload( $uploaded_file, $overrides );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $file[&#39;error&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( $file[&#39;error&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url      = $file[&#39;url&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$type     = $file[&#39;type&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file     = $file[&#39;file&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$filename = wp_basename( $file );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Construct the object array<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$object = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_title&#39;     =&gt; $filename,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_content&#39;   =&gt; $url,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post_mime_type&#39; =&gt; $type,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;guid&#39;           =&gt; $url,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;context&#39;        =&gt; &#39;custom&ndash;background&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Save the data<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$id = wp_insert_attachment( $object, $file );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Add the meta&ndash;data<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $file ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $id, &#39;_wp_attachment_is_custom_background&#39;, get_option( &#39;stylesheet&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_image&#39;, esc_url_raw( $url ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$thumbnail = wp_get_attachment_image_src( $id, &#39;thumbnail&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_image_thumb&#39;, esc_url_raw( $thumbnail[0] ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;admin/custom&ndash;header.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;wp_create_file_in_uploads&#39;, $file, $id ); // For replication<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$this&ndash;&gt;updated = true;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Ajax handler for adding custom background context to an attachment.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Triggers when the user adds a new background image from the<br/>
+&nbsp;&nbsp;&nbsp; * Media Manager.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function ajax_background_add() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_ajax_referer( &#39;background&ndash;add&#39;, &#39;nonce&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_POST[&#39;attachment_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $attachment_id &lt; 1 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $attachment_id, &#39;_wp_attachment_is_custom_background&#39;, get_stylesheet() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_send_json_success();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; * @deprecated 3.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $form_fields<br/>
+&nbsp;&nbsp;&nbsp; * @return array $form_fields<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function attachment_fields_to_edit( $form_fields ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $form_fields;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; * @deprecated 3.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $tabs<br/>
+&nbsp;&nbsp;&nbsp; * @return array $tabs<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function filter_upload_tabs( $tabs ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $tabs;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; * @deprecated 3.5.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;public function wp_set_background_image() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_ajax_referer( &#39;custom&ndash;background&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_theme_options&#39; ) || ! isset( $_POST[&#39;attachment_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$attachment_id = absint( $_POST[&#39;attachment_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/includes/media.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sizes = array_keys(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;apply_filters(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;image_size_names_choose&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;thumbnail&#39; =&gt; __( &#39;Thumbnail&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;medium&#39;    =&gt; __( &#39;Medium&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;large&#39;     =&gt; __( &#39;Large&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;full&#39;      =&gt; __( &#39;Full Size&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size  = &#39;thumbnail&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $_POST[&#39;size&#39;], $sizes ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$size = esc_attr( $_POST[&#39;size&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_post_meta( $attachment_id, &#39;_wp_attachment_is_custom_background&#39;, get_option( &#39;stylesheet&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url       = wp_get_attachment_image_src( $attachment_id, $size );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$thumbnail = wp_get_attachment_image_src( $attachment_id, &#39;thumbnail&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_image&#39;, esc_url_raw( $url[0] ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_theme_mod( &#39;background_image_thumb&#39;, esc_url_raw( $thumbnail[0] ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}</body></html>

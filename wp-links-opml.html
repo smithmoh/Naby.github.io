@@ -1,0 +1,103 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Outputs the OPML XML format for getting the links defined in the link<br/>
+ * administration. This can be used to export links from one blog over to<br/>
+ * another. Links aren&#39;t exported by the WordPress export, so this file handles<br/>
+ * that.<br/>
+ *<br/>
+ * This file is not added by default to WordPress theme pages when outputting<br/>
+ * feed links. It will have to be added manually for browsers and users to pick<br/>
+ * up that this file exists.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+require_once( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+header( &#39;Content&ndash;Type: text/xml; charset=&#39; . get_option( &#39;blog_charset&#39; ), true );<br/>
+$link_cat = &#39;&#39;;<br/>
+if ( ! empty( $_GET[&#39;link_cat&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$link_cat = $_GET[&#39;link_cat&#39;];<br/>
+&nbsp;&nbsp;&nbsp;if ( ! in_array( $link_cat, array( &#39;all&#39;, &#39;0&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$link_cat = absint( (string) urldecode( $link_cat ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+echo &#39;&lt;?xml version=&quot;1.0&quot;?&#39; . &quot;&gt;\n&quot;;<br/>
+?&gt;<br/>
+&lt;opml version=&quot;1.0&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;head&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;title&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site name */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Links for %s&#39; ), esc_attr( get_bloginfo( &#39;name&#39;, &#39;display&#39; ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/title&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;dateCreated&gt;&lt;?php echo gmdate( &#39;D, d M Y H:i:s&#39; ); ?&gt; GMT&lt;/dateCreated&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires in the OPML header.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;opml_head&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/head&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;body&gt;<br/>
+&lt;?php<br/>
+if ( empty( $link_cat ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$cats = get_categories(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;taxonomy&#39;     =&gt; &#39;link_category&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;hierarchical&#39; =&gt; 0,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$cats = get_categories(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;taxonomy&#39;     =&gt; &#39;link_category&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;hierarchical&#39; =&gt; 0,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;include&#39;      =&gt; $link_cat,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+foreach ( (array) $cats as $cat ) :<br/>
+&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;includes/bookmark&ndash;template.php */<br/>
+&nbsp;&nbsp;&nbsp;$catname = apply_filters( &#39;link_category&#39;, $cat&ndash;&gt;name );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;outline type=&quot;category&quot; title=&quot;&lt;?php echo esc_attr( $catname ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;$bookmarks = get_bookmarks( array( &#39;category&#39; =&gt; $cat&ndash;&gt;term_id ) );<br/>
+&nbsp;&nbsp;&nbsp;foreach ( (array) $bookmarks as $bookmark ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the OPML outline link title text.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.2.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $title The OPML outline title text.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = apply_filters( &#39;link_title&#39;, $bookmark&ndash;&gt;link_name );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;outline text=&quot;&lt;?php echo esc_attr( $title ); ?&gt;&quot; type=&quot;link&quot; xmlUrl=&quot;&lt;?php echo esc_attr( $bookmark&ndash;&gt;link_rss ); ?&gt;&quot; htmlUrl=&quot;&lt;?php echo esc_attr( $bookmark&ndash;&gt;link_url ); ?&gt;&quot; updated=&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;0000&ndash;00&ndash;00 00:00:00&#39; != $bookmark&ndash;&gt;link_updated ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo $bookmark&ndash;&gt;link_updated;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;endforeach; // $bookmarks<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/outline&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+endforeach; // $cats<br/>
+?&gt;<br/>
+&lt;/body&gt;<br/>
+&lt;/opml&gt;</body></html>

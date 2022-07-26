@@ -1,0 +1,90 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+<br/>
+/**<br/>
+ * Disable error reporting<br/>
+ *<br/>
+ * Set this to error_reporting( &ndash;1 ) for debugging<br/>
+ */<br/>
+error_reporting( 0 );<br/>
+<br/>
+/** Set ABSPATH for execution */<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;ABSPATH&#39;, dirname( dirname( __FILE__ ) ) . &#39;/&#39; );<br/>
+}<br/>
+<br/>
+define( &#39;WPINC&#39;, &#39;wp&ndash;includes&#39; );<br/>
+<br/>
+require( ABSPATH . &#39;wp&ndash;admin/includes/noop.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/script&ndash;loader.php&#39; );<br/>
+require( ABSPATH . WPINC . &#39;/version.php&#39; );<br/>
+<br/>
+$load = $_GET[&#39;load&#39;];<br/>
+if ( is_array( $load ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$load = implode( &#39;&#39;, $load );<br/>
+}<br/>
+$load = preg_replace( &#39;/[^a&ndash;z0&ndash;9,_&ndash;]+/i&#39;, &#39;&#39;, $load );<br/>
+$load = array_unique( explode( &#39;,&#39;, $load ) );<br/>
+<br/>
+if ( empty( $load ) ) {<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+$rtl            = ( isset( $_GET[&#39;dir&#39;] ) &amp;&amp; &#39;rtl&#39; == $_GET[&#39;dir&#39;] );<br/>
+$expires_offset = 31536000; // 1 year<br/>
+$out            = &#39;&#39;;<br/>
+<br/>
+$wp_styles = new WP_Styles();<br/>
+wp_default_styles( $wp_styles );<br/>
+<br/>
+if ( isset( $_SERVER[&#39;HTTP_IF_NONE_MATCH&#39;] ) &amp;&amp; stripslashes( $_SERVER[&#39;HTTP_IF_NONE_MATCH&#39;] ) === $wp_version ) {<br/>
+&nbsp;&nbsp;&nbsp;$protocol = $_SERVER[&#39;SERVER_PROTOCOL&#39;];<br/>
+&nbsp;&nbsp;&nbsp;if ( ! in_array( $protocol, array( &#39;HTTP/1.1&#39;, &#39;HTTP/2&#39;, &#39;HTTP/2.0&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$protocol = &#39;HTTP/1.0&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;header( &quot;$protocol 304 Not Modified&quot; );<br/>
+&nbsp;&nbsp;&nbsp;exit();<br/>
+}<br/>
+<br/>
+foreach ( $load as $handle ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! array_key_exists( $handle, $wp_styles&ndash;&gt;registered ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$style = $wp_styles&ndash;&gt;registered[ $handle ];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $style&ndash;&gt;src ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$path = ABSPATH . $style&ndash;&gt;src;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $rtl &amp;&amp; ! empty( $style&ndash;&gt;extra[&#39;rtl&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// All default styles have fully independent RTL files.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$path = str_replace( &#39;.min.css&#39;, &#39;&ndash;rtl.min.css&#39;, $path );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$content = get_file( $path ) . &quot;\n&quot;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( strpos( $style&ndash;&gt;src, &#39;/&#39; . WPINC . &#39;/css/&#39; ) === 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = str_replace( &#39;../images/&#39;, &#39;../&#39; . WPINC . &#39;/images/&#39;, $content );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = str_replace( &#39;../js/tinymce/&#39;, &#39;../&#39; . WPINC . &#39;/js/tinymce/&#39;, $content );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$content = str_replace( &#39;../fonts/&#39;, &#39;../&#39; . WPINC . &#39;/fonts/&#39;, $content );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$out    .= $content;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$out .= str_replace( &#39;../images/&#39;, &#39;images/&#39;, $content );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+header( &quot;Etag: $wp_version&quot; );<br/>
+header( &#39;Content&ndash;Type: text/css; charset=UTF&ndash;8&#39; );<br/>
+header( &#39;Expires: &#39; . gmdate( &#39;D, d M Y H:i:s&#39;, time() + $expires_offset ) . &#39; GMT&#39; );<br/>
+header( &quot;Cache&ndash;Control: public, max&ndash;age=$expires_offset&quot; );<br/>
+<br/>
+echo $out;<br/>
+exit;</body></html>

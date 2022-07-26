@@ -1,0 +1,315 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Build Administration Menu.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * Constructs the admin menu.<br/>
+ *<br/>
+ * The elements in the array are :<br/>
+ *     0: Menu item name<br/>
+ *     1: Minimum level or capability required.<br/>
+ *     2: The URL of the item&#39;s file<br/>
+ *     3: Class<br/>
+ *     4: ID<br/>
+ *     5: Icon for top level menu<br/>
+ *<br/>
+ * @global array $menu<br/>
+ */<br/>
+<br/>
+$menu[2] = array( __( &#39;Dashboard&#39; ), &#39;read&#39;, &#39;index.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;top&ndash;first menu&ndash;icon&ndash;dashboard&#39;, &#39;menu&ndash;dashboard&#39;, &#39;dashicons&ndash;dashboard&#39; );<br/>
+<br/>
+$submenu[&#39;index.php&#39;][0] = array( __( &#39;Home&#39; ), &#39;read&#39;, &#39;index.php&#39; );<br/>
+<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;index.php&#39;][5] = array( __( &#39;My Sites&#39; ), &#39;read&#39;, &#39;my&ndash;sites.php&#39; );<br/>
+}<br/>
+<br/>
+if ( ! is_multisite() || current_user_can( &#39;update_core&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$update_data = wp_get_update_data();<br/>
+}<br/>
+<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( current_user_can( &#39;update_core&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cap = &#39;update_core&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( current_user_can( &#39;update_plugins&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cap = &#39;update_plugins&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( current_user_can( &#39;update_themes&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cap = &#39;update_themes&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$cap = &#39;update_languages&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: number of pending updates */<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;index.php&#39;][10] = array( sprintf( __( &#39;Updates %s&#39; ), &quot;&lt;span class=&#39;update&ndash;plugins count&ndash;{$update_data[&#39;counts&#39;][&#39;total&#39;]}&#39;&gt;&lt;span class=&#39;update&ndash;count&#39;&gt;&quot; . number_format_i18n( $update_data[&#39;counts&#39;][&#39;total&#39;] ) . &#39;&lt;/span&gt;&lt;/span&gt;&#39; ), $cap, &#39;update&ndash;core.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;unset( $cap );<br/>
+}<br/>
+<br/>
+$menu[4] = array( &#39;&#39;, &#39;read&#39;, &#39;separator1&#39;, &#39;&#39;, &#39;wp&ndash;menu&ndash;separator&#39; );<br/>
+<br/>
+// $menu[5] = Posts<br/>
+<br/>
+$menu[10]                     = array( __( &#39;Media&#39; ), &#39;upload_files&#39;, &#39;upload.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;media&#39;, &#39;menu&ndash;media&#39;, &#39;dashicons&ndash;admin&ndash;media&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;upload.php&#39;][5] = array( __( &#39;Library&#39; ), &#39;upload_files&#39;, &#39;upload.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;/* translators: add new file */<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;upload.php&#39;][10] = array( _x( &#39;Add New&#39;, &#39;file&#39; ), &#39;upload_files&#39;, &#39;media&ndash;new.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$i                         = 15;<br/>
+foreach ( get_taxonomies_for_attachments( &#39;objects&#39; ) as $tax ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $tax&ndash;&gt;show_ui || ! $tax&ndash;&gt;show_in_menu ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;upload.php&#39;][ $i++ ] = array( esc_attr( $tax&ndash;&gt;labels&ndash;&gt;menu_name ), $tax&ndash;&gt;cap&ndash;&gt;manage_terms, &#39;edit&ndash;tags.php?taxonomy=&#39; . $tax&ndash;&gt;name . &#39;&amp;amp;post_type=attachment&#39; );<br/>
+}<br/>
+&nbsp;&nbsp;&nbsp;unset( $tax, $i );<br/>
+<br/>
+$menu[15]                           = array( __( &#39;Links&#39; ), &#39;manage_links&#39;, &#39;link&ndash;manager.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;links&#39;, &#39;menu&ndash;links&#39;, &#39;dashicons&ndash;admin&ndash;links&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;link&ndash;manager.php&#39;][5] = array( _x( &#39;All Links&#39;, &#39;admin menu&#39; ), &#39;manage_links&#39;, &#39;link&ndash;manager.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;/* translators: add new links */<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;link&ndash;manager.php&#39;][10] = array( _x( &#39;Add New&#39;, &#39;link&#39; ), &#39;manage_links&#39;, &#39;link&ndash;add.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;link&ndash;manager.php&#39;][15] = array( __( &#39;Link Categories&#39; ), &#39;manage_categories&#39;, &#39;edit&ndash;tags.php?taxonomy=link_category&#39; );<br/>
+<br/>
+// $menu[20] = Pages<br/>
+<br/>
+// Avoid the comment count query for users who cannot edit_posts.<br/>
+if ( current_user_can( &#39;edit_posts&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$awaiting_mod      = wp_count_comments();<br/>
+&nbsp;&nbsp;&nbsp;$awaiting_mod      = $awaiting_mod&ndash;&gt;moderated;<br/>
+&nbsp;&nbsp;&nbsp;$awaiting_mod_i18n = number_format_i18n( $awaiting_mod );<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments in moderation */<br/>
+&nbsp;&nbsp;&nbsp;$awaiting_mod_text = sprintf( _n( &#39;%s Comment in moderation&#39;, &#39;%s Comments in moderation&#39;, $awaiting_mod ), $awaiting_mod_i18n );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$menu[25] = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments in moderation */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf( __( &#39;Comments %s&#39; ), &#39;&lt;span class=&quot;awaiting&ndash;mod count&ndash;&#39; . absint( $awaiting_mod ) . &#39;&quot;&gt;&lt;span class=&quot;pending&ndash;count&quot; aria&ndash;hidden=&quot;true&quot;&gt;&#39; . $awaiting_mod_i18n . &#39;&lt;/span&gt;&lt;span class=&quot;comments&ndash;in&ndash;moderation&ndash;text screen&ndash;reader&ndash;text&quot;&gt;&#39; . $awaiting_mod_text . &#39;&lt;/span&gt;&lt;/span&gt;&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;edit_posts&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;edit&ndash;comments.php&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;menu&ndash;top menu&ndash;icon&ndash;comments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;menu&ndash;comments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;dashicons&ndash;admin&ndash;comments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;unset( $awaiting_mod );<br/>
+}<br/>
+<br/>
+$submenu[&#39;edit&ndash;comments.php&#39;][0] = array( __( &#39;All Comments&#39; ), &#39;edit_posts&#39;, &#39;edit&ndash;comments.php&#39; );<br/>
+<br/>
+$_wp_last_object_menu = 25; // The index of the last top&ndash;level menu in the object menu group<br/>
+<br/>
+$types   = (array) get_post_types(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show_ui&#39;      =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;_builtin&#39;     =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show_in_menu&#39; =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+$builtin = array( &#39;post&#39;, &#39;page&#39; );<br/>
+foreach ( array_merge( $builtin, $types ) as $ptype ) {<br/>
+&nbsp;&nbsp;&nbsp;$ptype_obj = get_post_type_object( $ptype );<br/>
+&nbsp;&nbsp;&nbsp;// Check if it should be a submenu.<br/>
+&nbsp;&nbsp;&nbsp;if ( $ptype_obj&ndash;&gt;show_in_menu !== true ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;$ptype_menu_position = is_int( $ptype_obj&ndash;&gt;menu_position ) ? $ptype_obj&ndash;&gt;menu_position : ++$_wp_last_object_menu; // If we&#39;re to use $_wp_last_object_menu, increment it first.<br/>
+&nbsp;&nbsp;&nbsp;$ptype_for_id        = sanitize_html_class( $ptype );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$menu_icon = &#39;dashicons&ndash;admin&ndash;post&#39;;<br/>
+&nbsp;&nbsp;&nbsp;if ( is_string( $ptype_obj&ndash;&gt;menu_icon ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Special handling for data:image/svg+xml and Dashicons.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( 0 === strpos( $ptype_obj&ndash;&gt;menu_icon, &#39;data:image/svg+xml;base64,&#39; ) || 0 === strpos( $ptype_obj&ndash;&gt;menu_icon, &#39;dashicons&ndash;&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_icon = $ptype_obj&ndash;&gt;menu_icon;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_icon = esc_url( $ptype_obj&ndash;&gt;menu_icon );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( in_array( $ptype, $builtin ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_icon = &#39;dashicons&ndash;admin&ndash;&#39; . $ptype;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$menu_class = &#39;menu&ndash;top menu&ndash;icon&ndash;&#39; . $ptype_for_id;<br/>
+&nbsp;&nbsp;&nbsp;// &#39;post&#39; special case<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;post&#39; === $ptype ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_class    .= &#39; open&ndash;if&ndash;no&ndash;js&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ptype_file     = &#39;edit.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_new_file  = &#39;post&ndash;new.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$edit_tags_file = &#39;edit&ndash;tags.php?taxonomy=%s&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ptype_file     = &quot;edit.php?post_type=$ptype&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_new_file  = &quot;post&ndash;new.php?post_type=$ptype&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$edit_tags_file = &quot;edit&ndash;tags.php?taxonomy=%s&amp;amp;post_type=$ptype&quot;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( in_array( $ptype, $builtin ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ptype_menu_id = &#39;menu&ndash;&#39; . $ptype_for_id . &#39;s&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ptype_menu_id = &#39;menu&ndash;posts&ndash;&#39; . $ptype_for_id;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp; * If $ptype_menu_position is already populated or will be populated<br/>
+&nbsp;&nbsp;&nbsp; * by a hard&ndash;coded value below, increment the position.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$core_menu_positions = array( 59, 60, 65, 70, 75, 80, 85, 99 );<br/>
+&nbsp;&nbsp;&nbsp;while ( isset( $menu[ $ptype_menu_position ] ) || in_array( $ptype_menu_position, $core_menu_positions ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ptype_menu_position++;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$menu[ $ptype_menu_position ] = array( esc_attr( $ptype_obj&ndash;&gt;labels&ndash;&gt;menu_name ), $ptype_obj&ndash;&gt;cap&ndash;&gt;edit_posts, $ptype_file, &#39;&#39;, $menu_class, $ptype_menu_id, $menu_icon );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[ $ptype_file ][5]    = array( $ptype_obj&ndash;&gt;labels&ndash;&gt;all_items, $ptype_obj&ndash;&gt;cap&ndash;&gt;edit_posts, $ptype_file );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[ $ptype_file ][10]   = array( $ptype_obj&ndash;&gt;labels&ndash;&gt;add_new, $ptype_obj&ndash;&gt;cap&ndash;&gt;create_posts, $post_new_file );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$i = 15;<br/>
+&nbsp;&nbsp;&nbsp;foreach ( get_taxonomies( array(), &#39;objects&#39; ) as $tax ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $tax&ndash;&gt;show_ui || ! $tax&ndash;&gt;show_in_menu || ! in_array( $ptype, (array) $tax&ndash;&gt;object_type, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu[ $ptype_file ][ $i++ ] = array( esc_attr( $tax&ndash;&gt;labels&ndash;&gt;menu_name ), $tax&ndash;&gt;cap&ndash;&gt;manage_terms, sprintf( $edit_tags_file, $tax&ndash;&gt;name ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+unset( $ptype, $ptype_obj, $ptype_for_id, $ptype_menu_position, $menu_icon, $i, $tax, $post_new_file );<br/>
+<br/>
+$menu[59] = array( &#39;&#39;, &#39;read&#39;, &#39;separator2&#39;, &#39;&#39;, &#39;wp&ndash;menu&ndash;separator&#39; );<br/>
+<br/>
+$appearance_cap = current_user_can( &#39;switch_themes&#39; ) ? &#39;switch_themes&#39; : &#39;edit_theme_options&#39;;<br/>
+<br/>
+$menu[60]                     = array( __( &#39;Appearance&#39; ), $appearance_cap, &#39;themes.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;appearance&#39;, &#39;menu&ndash;appearance&#39;, &#39;dashicons&ndash;admin&ndash;appearance&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;themes.php&#39;][5] = array( __( &#39;Themes&#39; ), $appearance_cap, &#39;themes.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$customize_url            = add_query_arg( &#39;return&#39;, urlencode( remove_query_arg( wp_removable_query_args(), wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) ) ), &#39;customize.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;themes.php&#39;][6] = array( __( &#39;Customize&#39; ), &#39;customize&#39;, esc_url( $customize_url ), &#39;&#39;, &#39;hide&ndash;if&ndash;no&ndash;customize&#39; );<br/>
+<br/>
+if ( current_theme_supports( &#39;menus&#39; ) || current_theme_supports( &#39;widgets&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;themes.php&#39;][10] = array( __( &#39;Menus&#39; ), &#39;edit_theme_options&#39;, &#39;nav&ndash;menus.php&#39; );<br/>
+}<br/>
+<br/>
+if ( current_theme_supports( &#39;custom&ndash;header&#39; ) &amp;&amp; current_user_can( &#39;customize&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$customize_header_url      = add_query_arg( array( &#39;autofocus&#39; =&gt; array( &#39;control&#39; =&gt; &#39;header_image&#39; ) ), $customize_url );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;themes.php&#39;][15] = array( __( &#39;Header&#39; ), $appearance_cap, esc_url( $customize_header_url ), &#39;&#39;, &#39;hide&ndash;if&ndash;no&ndash;customize&#39; );<br/>
+}<br/>
+<br/>
+if ( current_theme_supports( &#39;custom&ndash;background&#39; ) &amp;&amp; current_user_can( &#39;customize&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$customize_background_url  = add_query_arg( array( &#39;autofocus&#39; =&gt; array( &#39;control&#39; =&gt; &#39;background_image&#39; ) ), $customize_url );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;themes.php&#39;][20] = array( __( &#39;Background&#39; ), $appearance_cap, esc_url( $customize_background_url ), &#39;&#39;, &#39;hide&ndash;if&ndash;no&ndash;customize&#39; );<br/>
+}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;unset( $customize_url );<br/>
+<br/>
+unset( $appearance_cap );<br/>
+<br/>
+// Add &#39;Editor&#39; to the bottom of the Appearance menu.<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;add_action( &#39;admin_menu&#39;, &#39;_add_themes_utility_last&#39;, 101 );<br/>
+}<br/>
+/**<br/>
+ * Adds the (theme) &#39;Editor&#39; link to the bottom of the Appearance menu.<br/>
+ *<br/>
+ * @access private<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+function _add_themes_utility_last() {<br/>
+&nbsp;&nbsp;&nbsp;// Must use API on the admin_menu hook, direct modification is only possible on/before the _admin_menu hook<br/>
+&nbsp;&nbsp;&nbsp;add_submenu_page( &#39;themes.php&#39;, __( &#39;Theme Editor&#39; ), __( &#39;Theme Editor&#39; ), &#39;edit_themes&#39;, &#39;theme&ndash;editor.php&#39; );<br/>
+}<br/>
+<br/>
+$count = &#39;&#39;;<br/>
+if ( ! is_multisite() &amp;&amp; current_user_can( &#39;update_plugins&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! isset( $update_data ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$update_data = wp_get_update_data();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;$count = &quot;&lt;span class=&#39;update&ndash;plugins count&ndash;{$update_data[&#39;counts&#39;][&#39;plugins&#39;]}&#39;&gt;&lt;span class=&#39;plugin&ndash;count&#39;&gt;&quot; . number_format_i18n( $update_data[&#39;counts&#39;][&#39;plugins&#39;] ) . &#39;&lt;/span&gt;&lt;/span&gt;&#39;;<br/>
+}<br/>
+<br/>
+/* translators: %s: number of pending plugin updates */<br/>
+$menu[65] = array( sprintf( __( &#39;Plugins %s&#39; ), $count ), &#39;activate_plugins&#39;, &#39;plugins.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;plugins&#39;, &#39;menu&ndash;plugins&#39;, &#39;dashicons&ndash;admin&ndash;plugins&#39; );<br/>
+<br/>
+$submenu[&#39;plugins.php&#39;][5] = array( __( &#39;Installed Plugins&#39; ), &#39;activate_plugins&#39;, &#39;plugins.php&#39; );<br/>
+<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: add new plugin */<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;plugins.php&#39;][10] = array( _x( &#39;Add New&#39;, &#39;plugin&#39; ), &#39;install_plugins&#39;, &#39;plugin&ndash;install.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;plugins.php&#39;][15] = array( __( &#39;Plugin Editor&#39; ), &#39;edit_plugins&#39;, &#39;plugin&ndash;editor.php&#39; );<br/>
+}<br/>
+<br/>
+unset( $update_data );<br/>
+<br/>
+if ( current_user_can( &#39;list_users&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$menu[70] = array( __( &#39;Users&#39; ), &#39;list_users&#39;, &#39;users.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;users&#39;, &#39;menu&ndash;users&#39;, &#39;dashicons&ndash;admin&ndash;users&#39; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$menu[70] = array( __( &#39;Profile&#39; ), &#39;read&#39;, &#39;profile.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;users&#39;, &#39;menu&ndash;users&#39;, &#39;dashicons&ndash;admin&ndash;users&#39; );<br/>
+}<br/>
+<br/>
+if ( current_user_can( &#39;list_users&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$_wp_real_parent_file[&#39;profile.php&#39;] = &#39;users.php&#39;; // Back&ndash;compat for plugins adding submenus to profile.php.<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;users.php&#39;][5]             = array( __( &#39;All Users&#39; ), &#39;list_users&#39;, &#39;users.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( current_user_can( &#39;create_users&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu[&#39;users.php&#39;][10] = array( _x( &#39;Add New&#39;, &#39;user&#39; ), &#39;create_users&#39;, &#39;user&ndash;new.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu[&#39;users.php&#39;][10] = array( _x( &#39;Add New&#39;, &#39;user&#39; ), &#39;promote_users&#39;, &#39;user&ndash;new.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;users.php&#39;][15] = array( __( &#39;Your Profile&#39; ), &#39;read&#39;, &#39;profile.php&#39; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$_wp_real_parent_file[&#39;users.php&#39;] = &#39;profile.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;profile.php&#39;][5]         = array( __( &#39;Your Profile&#39; ), &#39;read&#39;, &#39;profile.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( current_user_can( &#39;create_users&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu[&#39;profile.php&#39;][10] = array( __( &#39;Add New User&#39; ), &#39;create_users&#39;, &#39;user&ndash;new.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu[&#39;profile.php&#39;][10] = array( __( &#39;Add New User&#39; ), &#39;promote_users&#39;, &#39;user&ndash;new.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+$menu[75]                     = array( __( &#39;Tools&#39; ), &#39;edit_posts&#39;, &#39;tools.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;tools&#39;, &#39;menu&ndash;tools&#39;, &#39;dashicons&ndash;admin&ndash;tools&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;tools.php&#39;][5]  = array( __( &#39;Available Tools&#39; ), &#39;edit_posts&#39;, &#39;tools.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;tools.php&#39;][10] = array( __( &#39;Import&#39; ), &#39;import&#39;, &#39;import.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;tools.php&#39;][15] = array( __( &#39;Export&#39; ), &#39;export&#39;, &#39;export.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;tools.php&#39;][20] = array( __( &#39;Site Health&#39; ), &#39;view_site_health_checks&#39;, &#39;site&ndash;health.php&#39; );<br/>
+if ( is_multisite() &amp;&amp; ! is_main_site() ) {<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;tools.php&#39;][25] = array( __( &#39;Delete Site&#39; ), &#39;delete_site&#39;, &#39;ms&ndash;delete&ndash;site.php&#39; );<br/>
+}<br/>
+if ( ! is_multisite() &amp;&amp; defined( &#39;WP_ALLOW_MULTISITE&#39; ) &amp;&amp; WP_ALLOW_MULTISITE ) {<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;tools.php&#39;][50] = array( __( &#39;Network Setup&#39; ), &#39;setup_network&#39;, &#39;network.php&#39; );<br/>
+}<br/>
+<br/>
+$menu[80]                               = array( __( &#39;Settings&#39; ), &#39;manage_options&#39;, &#39;options&ndash;general.php&#39;, &#39;&#39;, &#39;menu&ndash;top menu&ndash;icon&ndash;settings&#39;, &#39;menu&ndash;settings&#39;, &#39;dashicons&ndash;admin&ndash;settings&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][10] = array( _x( &#39;General&#39;, &#39;settings screen&#39; ), &#39;manage_options&#39;, &#39;options&ndash;general.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][15] = array( __( &#39;Writing&#39; ), &#39;manage_options&#39;, &#39;options&ndash;writing.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][20] = array( __( &#39;Reading&#39; ), &#39;manage_options&#39;, &#39;options&ndash;reading.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][25] = array( __( &#39;Discussion&#39; ), &#39;manage_options&#39;, &#39;options&ndash;discussion.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][30] = array( __( &#39;Media&#39; ), &#39;manage_options&#39;, &#39;options&ndash;media.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][40] = array( __( &#39;Permalinks&#39; ), &#39;manage_options&#39;, &#39;options&ndash;permalink.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submenu[&#39;options&ndash;general.php&#39;][45] = array( __( &#39;Privacy&#39; ), &#39;manage_privacy_options&#39;, &#39;privacy.php&#39; );<br/>
+<br/>
+$_wp_last_utility_menu = 80; // The index of the last top&ndash;level menu in the utility menu group<br/>
+<br/>
+$menu[99] = array( &#39;&#39;, &#39;read&#39;, &#39;separator&ndash;last&#39;, &#39;&#39;, &#39;wp&ndash;menu&ndash;separator&#39; );<br/>
+<br/>
+// Back&ndash;compat for old top&ndash;levels<br/>
+$_wp_real_parent_file[&#39;post.php&#39;]       = &#39;edit.php&#39;;<br/>
+$_wp_real_parent_file[&#39;post&ndash;new.php&#39;]   = &#39;edit.php&#39;;<br/>
+$_wp_real_parent_file[&#39;edit&ndash;pages.php&#39;] = &#39;edit.php?post_type=page&#39;;<br/>
+$_wp_real_parent_file[&#39;page&ndash;new.php&#39;]   = &#39;edit.php?post_type=page&#39;;<br/>
+$_wp_real_parent_file[&#39;wpmu&ndash;admin.php&#39;] = &#39;tools.php&#39;;<br/>
+$_wp_real_parent_file[&#39;ms&ndash;admin.php&#39;]   = &#39;tools.php&#39;;<br/>
+<br/>
+// Ensure backward compatibility.<br/>
+$compat = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;index&#39;           =&gt; &#39;dashboard&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;edit&#39;            =&gt; &#39;posts&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;post&#39;            =&gt; &#39;posts&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;upload&#39;          =&gt; &#39;media&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;link&ndash;manager&#39;    =&gt; &#39;links&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;edit&ndash;pages&#39;      =&gt; &#39;pages&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;page&#39;            =&gt; &#39;pages&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;edit&ndash;comments&#39;   =&gt; &#39;comments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;options&ndash;general&#39; =&gt; &#39;settings&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;themes&#39;          =&gt; &#39;appearance&#39;,<br/>
+);<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/menu.php&#39; );</body></html>

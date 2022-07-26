@@ -1,0 +1,95 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Manage media uploaded file.<br/>
+ *<br/>
+ * There are many filters in here for media. Plugins can extend functionality<br/>
+ * by hooking into the filters.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** Load WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! current_user_can( &#39;upload_files&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to upload files.&#39; ) );<br/>
+}<br/>
+<br/>
+wp_enqueue_script( &#39;plupload&ndash;handlers&#39; );<br/>
+<br/>
+$post_id = 0;<br/>
+if ( isset( $_REQUEST[&#39;post_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$post_id = absint( $_REQUEST[&#39;post_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! get_post( $post_id ) || ! current_user_can( &#39;edit_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_id = 0;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( $_POST ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;html&ndash;upload&#39;] ) &amp;&amp; ! empty( $_FILES ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;media&ndash;form&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Upload File button was clicked<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$upload_id = media_handle_upload( &#39;async&ndash;upload&#39;, $post_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_wp_error( $upload_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( $upload_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;upload.php&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+$title       = __( &#39;Upload New Media&#39; );<br/>
+$parent_file = &#39;upload.php&#39;;<br/>
+<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;You can upload media files here without creating a post first. This allows you to upload files to use with posts and pages later and/or to get a web link for a particular file that you can share. There are three options for uploading files:&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;ul&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;&lt;strong&gt;Drag and drop&lt;/strong&gt; your files into the area below. Multiple files are allowed.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;Clicking &lt;strong&gt;Select Files&lt;/strong&gt; opens a navigation window showing you files in your operating system. Selecting &lt;strong&gt;Open&lt;/strong&gt; after clicking on the file you want activates a progress bar on the uploader screen.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;li&gt;&#39; . __( &#39;Revert to the &lt;strong&gt;Browser Uploader&lt;/strong&gt; by clicking the link below the drag and drop box.&#39; ) . &#39;&lt;/li&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;/ul&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Media_Add_New_Screen&quot;&gt;Documentation on Uploading Media Files&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+);<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+$form_class = &#39;media&ndash;upload&ndash;form type&ndash;form validate&#39;;<br/>
+<br/>
+if ( get_user_setting( &#39;uploader&#39; ) || isset( $_GET[&#39;browser&ndash;uploader&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$form_class .= &#39; html&ndash;uploader&#39;;<br/>
+}<br/>
+?&gt;<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h1&gt;&lt;?php echo esc_html( $title ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;form enctype=&quot;multipart/form&ndash;data&quot; method=&quot;post&quot; action=&quot;&lt;?php echo admin_url( &#39;media&ndash;new.php&#39; ); ?&gt;&quot; class=&quot;&lt;?php echo esc_attr( $form_class ); ?&gt;&quot; id=&quot;file&ndash;form&quot;&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php media_upload_form(); ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;var post_id = &lt;?php echo absint( $post_id ); ?&gt;, shortform = 3;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;post_id&quot; id=&quot;post_id&quot; value=&quot;&lt;?php echo absint( $post_id ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;media&ndash;form&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;media&ndash;items&quot; class=&quot;hide&ndash;if&ndash;no&ndash;js&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );</body></html>

@@ -1,0 +1,330 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Export Administration Screen<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** Load WordPress Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! current_user_can( &#39;export&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to export the content of this site.&#39; ) );<br/>
+}<br/>
+<br/>
+/** Load WordPress export API */<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/export.php&#39; );<br/>
+$title = __( &#39;Export&#39; );<br/>
+<br/>
+/**<br/>
+ * Display JavaScript on the page.<br/>
+ *<br/>
+ * @since 3.5.0<br/>
+ */<br/>
+function export_add_js() {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;jQuery(document).ready(function($){<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; var form = $(&#39;#export&ndash;filters&#39;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; filters = form.find(&#39;.export&ndash;filters&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; filters.hide();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; form.find(&#39;input:radio&#39;).change(function() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filters.slideUp(&#39;fast&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch ( $(this).val() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;attachment&#39;: $(&#39;#attachment&ndash;filters&#39;).slideDown(); break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;posts&#39;: $(&#39;#post&ndash;filters&#39;).slideDown(); break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;pages&#39;: $(&#39;#page&ndash;filters&#39;).slideDown(); break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; });<br/>
+&nbsp;&nbsp;&nbsp;});<br/>
+&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+add_action( &#39;admin_head&#39;, &#39;export_add_js&#39; );<br/>
+<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt; &#39;&lt;p&gt;&#39; . __( &#39;You can export a file of your site&amp;#8217;s content in order to import it into another installation or platform. The export file will be an XML file format called WXR. Posts, pages, comments, custom fields, categories, and tags can be included. You can choose for the WXR file to include only certain posts or pages by setting the dropdown filters to limit the export by category, author, date range by month, or publishing status.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Once generated, your WXR file can be imported by another WordPress site or by another blogging platform able to access this format.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Tools_Export_Screen&quot;&gt;Documentation on Export&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+);<br/>
+<br/>
+// If the &#39;download&#39; URL parameter is set, a WXR export file is baked and returned.<br/>
+if ( isset( $_GET[&#39;download&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$args = array();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;content&#39;] ) || &#39;all&#39; == $_GET[&#39;content&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;content&#39;] = &#39;all&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( &#39;posts&#39; == $_GET[&#39;content&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;content&#39;] = &#39;post&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;cat&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;category&#39;] = (int) $_GET[&#39;cat&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;post_author&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;author&#39;] = (int) $_GET[&#39;post_author&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;post_start_date&#39;] || $_GET[&#39;post_end_date&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;start_date&#39;] = $_GET[&#39;post_start_date&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;end_date&#39;]   = $_GET[&#39;post_end_date&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;post_status&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;status&#39;] = $_GET[&#39;post_status&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( &#39;pages&#39; == $_GET[&#39;content&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;content&#39;] = &#39;page&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;page_author&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;author&#39;] = (int) $_GET[&#39;page_author&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;page_start_date&#39;] || $_GET[&#39;page_end_date&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;start_date&#39;] = $_GET[&#39;page_start_date&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;end_date&#39;]   = $_GET[&#39;page_end_date&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;page_status&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;status&#39;] = $_GET[&#39;page_status&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( &#39;attachment&#39; == $_GET[&#39;content&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;content&#39;] = &#39;attachment&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $_GET[&#39;attachment_start_date&#39;] || $_GET[&#39;attachment_end_date&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;start_date&#39;] = $_GET[&#39;attachment_start_date&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;end_date&#39;]   = $_GET[&#39;attachment_end_date&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$args[&#39;content&#39;] = $_GET[&#39;content&#39;];<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the export args.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $args The arguments to send to the exporter.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$args = apply_filters( &#39;export_args&#39;, $args );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;export_wp( $args );<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+/**<br/>
+ * Create the date options fields for exporting a given post type.<br/>
+ *<br/>
+ * @global wpdb      $wpdb      WordPress database abstraction object.<br/>
+ * @global WP_Locale $wp_locale Date and Time Locale object.<br/>
+ *<br/>
+ * @since 3.1.0<br/>
+ *<br/>
+ * @param string $post_type The post type. Default &#39;post&#39;.<br/>
+ */<br/>
+function export_date_options( $post_type = &#39;post&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;global $wpdb, $wp_locale;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$months = $wpdb&ndash;&gt;get_results(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wpdb&ndash;&gt;prepare(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SELECT DISTINCT YEAR( post_date ) AS year, MONTH( post_date ) AS month<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FROM $wpdb&ndash;&gt;posts<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WHERE post_type = %s AND post_status != &#39;auto&ndash;draft&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ORDER BY post_date DESC<br/>
+&nbsp;&nbsp;&nbsp;&quot;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_type<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$month_count = count( $months );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $month_count || ( 1 == $month_count &amp;&amp; 0 == $months[0]&ndash;&gt;month ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $months as $date ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( 0 == $date&ndash;&gt;year ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$month = zeroise( $date&ndash;&gt;month, 2 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;option value=&quot;&#39; . $date&ndash;&gt;year . &#39;&ndash;&#39; . $month . &#39;&quot;&gt;&#39; . $wp_locale&ndash;&gt;get_month( $month ) . &#39; &#39; . $date&ndash;&gt;year . &#39;&lt;/option&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1&gt;&lt;?php echo esc_html( $title ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&lt;p&gt;&lt;?php _e( &#39;When you click the button below WordPress will create an XML file for you to save to your computer.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&lt;p&gt;&lt;?php _e( &#39;This format, which we call WordPress eXtended RSS or WXR, will contain your posts, pages, comments, custom fields, categories, and tags.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&lt;p&gt;&lt;?php _e( &#39;Once you&amp;#8217;ve saved the download file, you can use the Import function in another WordPress installation to import the content from this site.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Choose what to export&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&lt;form method=&quot;get&quot; id=&quot;export&ndash;filters&quot;&gt;<br/>
+&lt;fieldset&gt;<br/>
+&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Content to export&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;download&quot; value=&quot;true&quot; /&gt;<br/>
+&lt;p&gt;&lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;content&quot; value=&quot;all&quot; checked=&quot;checked&quot; aria&ndash;describedby=&quot;all&ndash;content&ndash;desc&quot; /&gt; &lt;?php _e( &#39;All content&#39; ); ?&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&lt;p class=&quot;description&quot; id=&quot;all&ndash;content&ndash;desc&quot;&gt;&lt;?php _e( &#39;This will contain all of your posts, pages, comments, custom fields, terms, navigation menus, and custom posts.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&lt;p&gt;&lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;content&quot; value=&quot;posts&quot; /&gt; &lt;?php _e( &#39;Posts&#39; ); ?&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&lt;ul id=&quot;post&ndash;filters&quot; class=&quot;export&ndash;filters&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label&gt;&lt;span class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Categories:&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_dropdown_categories( array( &#39;show_option_all&#39; =&gt; __( &#39;All&#39; ) ) ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label&gt;&lt;span class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Authors:&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$authors = $wpdb&ndash;&gt;get_col( &quot;SELECT DISTINCT post_author FROM {$wpdb&ndash;&gt;posts} WHERE post_type = &#39;post&#39;&quot; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_dropdown_users(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;include&#39;         =&gt; $authors,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;name&#39;            =&gt; &#39;post_author&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;multi&#39;           =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show_option_all&#39; =&gt; __( &#39;All&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show&#39;            =&gt; &#39;display_name_with_login&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Date range:&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;post&ndash;start&ndash;date&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Start date:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;post_start_date&quot; id=&quot;post&ndash;start&ndash;date&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;&amp;mdash; Select &amp;mdash;&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php export_date_options(); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;post&ndash;end&ndash;date&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;End date:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;post_end_date&quot; id=&quot;post&ndash;end&ndash;date&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;&amp;mdash; Select &amp;mdash;&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php export_date_options(); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;post&ndash;status&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Status:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;post_status&quot; id=&quot;post&ndash;status&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;All&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_stati = get_post_stati( array( &#39;internal&#39; =&gt; false ), &#39;objects&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $post_stati as $status ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;&lt;?php echo esc_attr( $status&ndash;&gt;name ); ?&gt;&quot;&gt;&lt;?php echo esc_html( $status&ndash;&gt;label ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endforeach; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&lt;/ul&gt;<br/>
+<br/>
+&lt;p&gt;&lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;content&quot; value=&quot;pages&quot; /&gt; &lt;?php _e( &#39;Pages&#39; ); ?&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&lt;ul id=&quot;page&ndash;filters&quot; class=&quot;export&ndash;filters&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label&gt;&lt;span class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Authors:&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$authors = $wpdb&ndash;&gt;get_col( &quot;SELECT DISTINCT post_author FROM {$wpdb&ndash;&gt;posts} WHERE post_type = &#39;page&#39;&quot; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_dropdown_users(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;include&#39;         =&gt; $authors,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;name&#39;            =&gt; &#39;page_author&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;multi&#39;           =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show_option_all&#39; =&gt; __( &#39;All&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show&#39;            =&gt; &#39;display_name_with_login&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Date range:&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;page&ndash;start&ndash;date&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Start date:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;page_start_date&quot; id=&quot;page&ndash;start&ndash;date&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;&amp;mdash; Select &amp;mdash;&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php export_date_options( &#39;page&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;page&ndash;end&ndash;date&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;End date:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;page_end_date&quot; id=&quot;page&ndash;end&ndash;date&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;&amp;mdash; Select &amp;mdash;&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php export_date_options( &#39;page&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;page&ndash;status&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Status:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;page_status&quot; id=&quot;page&ndash;status&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;All&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php foreach ( $post_stati as $status ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;&lt;?php echo esc_attr( $status&ndash;&gt;name ); ?&gt;&quot;&gt;&lt;?php echo esc_html( $status&ndash;&gt;label ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endforeach; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&lt;/ul&gt;<br/>
+<br/>
+&lt;?php<br/>
+foreach ( get_post_types(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;_builtin&#39;   =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;can_export&#39; =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&#39;objects&#39;<br/>
+) as $post_type ) :<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;p&gt;&lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;content&quot; value=&quot;&lt;?php echo esc_attr( $post_type&ndash;&gt;name ); ?&gt;&quot; /&gt; &lt;?php echo esc_html( $post_type&ndash;&gt;label ); ?&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&lt;?php endforeach; ?&gt;<br/>
+<br/>
+&lt;p&gt;&lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;content&quot; value=&quot;attachment&quot; /&gt; &lt;?php _e( &#39;Media&#39; ); ?&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&lt;ul id=&quot;attachment&ndash;filters&quot; class=&quot;export&ndash;filters&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Date range:&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;attachment&ndash;start&ndash;date&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;Start date:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;attachment_start_date&quot; id=&quot;attachment&ndash;start&ndash;date&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;&amp;mdash; Select &amp;mdash;&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php export_date_options( &#39;attachment&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;attachment&ndash;end&ndash;date&quot; class=&quot;label&ndash;responsive&quot;&gt;&lt;?php _e( &#39;End date:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;select name=&quot;attachment_end_date&quot; id=&quot;attachment&ndash;end&ndash;date&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;option value=&quot;0&quot;&gt;&lt;?php _e( &#39;&amp;mdash; Select &amp;mdash;&#39; ); ?&gt;&lt;/option&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php export_date_options( &#39;attachment&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/select&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/fieldset&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&lt;/ul&gt;<br/>
+<br/>
+&lt;/fieldset&gt;<br/>
+&lt;?php<br/>
+/**<br/>
+ * Fires at the end of the export filters form.<br/>
+ *<br/>
+ * @since 3.5.0<br/>
+ */<br/>
+do_action( &#39;export_filters&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;?php submit_button( __( &#39;Download Export File&#39; ) ); ?&gt;<br/>
+&lt;/form&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; ); ?&gt;</body></html>

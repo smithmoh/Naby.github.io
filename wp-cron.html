@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * A pseudo&ndash;CRON daemon for scheduling WordPress tasks<br/>
+ *<br/>
+ * WP Cron is triggered when the site receives a visit. In the scenario<br/>
+ * where a site may not receive enough visits to execute scheduled tasks<br/>
+ * in a timely manner, this file can be called directly or via a server<br/>
+ * CRON daemon for X number of times.<br/>
+ *<br/>
+ * Defining DISABLE_WP_CRON as true and calling this file directly are<br/>
+ * mutually exclusive and the latter does not rely on the former to work.<br/>
+ *<br/>
+ * The HTTP request to this file will not slow down the visitor who happens to<br/>
+ * visit when the cron job is needed to run.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+ignore_user_abort( true );<br/>
+<br/>
+/* Don&#39;t make the request block till we finish, if possible. */<br/>
+if ( function_exists( &#39;fastcgi_finish_request&#39; ) &amp;&amp; version_compare( phpversion(), &#39;7.0.16&#39;, &#39;&gt;=&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;fastcgi_finish_request();<br/>
+}<br/>
+<br/>
+if ( ! empty( $_POST ) || defined( &#39;DOING_AJAX&#39; ) || defined( &#39;DOING_CRON&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Tell WordPress we are doing the CRON task.<br/>
+ *<br/>
+ * @var bool<br/>
+ */<br/>
+define( &#39;DOING_CRON&#39;, true );<br/>
+<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;/** Set up WordPress environment */<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Retrieves the cron lock.<br/>
+ *<br/>
+ * Returns the uncached `doing_cron` transient.<br/>
+ *<br/>
+ * @ignore<br/>
+ * @since 3.3.0<br/>
+ *<br/>
+ * @global wpdb $wpdb WordPress database abstraction object.<br/>
+ *<br/>
+ * @return string|false Value of the `doing_cron` transient, 0|false otherwise.<br/>
+ */<br/>
+function _get_cron_lock() {<br/>
+&nbsp;&nbsp;&nbsp;global $wpdb;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$value = 0;<br/>
+&nbsp;&nbsp;&nbsp;if ( wp_using_ext_object_cache() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Skip local cache and force re&ndash;fetch of doing_cron transient<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * in case another process updated the cache.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$value = wp_cache_get( &#39;doing_cron&#39;, &#39;transient&#39;, true );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$row = $wpdb&ndash;&gt;get_row( $wpdb&ndash;&gt;prepare( &quot;SELECT option_value FROM $wpdb&ndash;&gt;options WHERE option_name = %s LIMIT 1&quot;, &#39;_transient_doing_cron&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_object( $row ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$value = $row&ndash;&gt;option_value;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;return $value;<br/>
+}<br/>
+<br/>
+$crons = wp_get_ready_cron_jobs();<br/>
+if ( empty( $crons ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+$gmt_time = microtime( true );<br/>
+<br/>
+// The cron lock: a unix timestamp from when the cron was spawned.<br/>
+$doing_cron_transient = get_transient( &#39;doing_cron&#39; );<br/>
+<br/>
+// Use global $doing_wp_cron lock otherwise use the GET lock. If no lock, trying grabbing a new lock.<br/>
+if ( empty( $doing_wp_cron ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $_GET[&#39;doing_wp_cron&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Called from external script/job. Try setting a lock.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $doing_cron_transient &amp;&amp; ( $doing_cron_transient + WP_CRON_LOCK_TIMEOUT &gt; $gmt_time ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$doing_cron_transient = $doing_wp_cron = sprintf( &#39;%.22F&#39;, microtime( true ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set_transient( &#39;doing_cron&#39;, $doing_wp_cron );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$doing_wp_cron = $_GET[&#39;doing_wp_cron&#39;];<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+/*<br/>
+ * The cron lock (a unix timestamp set when the cron was spawned),<br/>
+ * must match $doing_wp_cron (the &quot;key&quot;).<br/>
+ */<br/>
+if ( $doing_cron_transient != $doing_wp_cron ) {<br/>
+&nbsp;&nbsp;&nbsp;return;<br/>
+}<br/>
+<br/>
+foreach ( $crons as $timestamp =&gt; $cronhooks ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( $timestamp &gt; $gmt_time ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $cronhooks as $hook =&gt; $keys ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $keys as $k =&gt; $v ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$schedule = $v[&#39;schedule&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $schedule != false ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$new_args = array( $timestamp, $schedule, $hook, $v[&#39;args&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;call_user_func_array( &#39;wp_reschedule_event&#39;, $new_args );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_unschedule_event( $timestamp, $hook, $v[&#39;args&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires scheduled events.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @ignore<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $hook Name of the hook that was scheduled to be fired.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param array  $args The arguments to be passed to the hook.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action_ref_array( $hook, $v[&#39;args&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If the hook ran too long and another cron process stole the lock, quit.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( _get_cron_lock() != $doing_wp_cron ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( _get_cron_lock() == $doing_wp_cron ) {<br/>
+&nbsp;&nbsp;&nbsp;delete_transient( &#39;doing_cron&#39; );<br/>
+}<br/>
+<br/>
+die();</body></html>

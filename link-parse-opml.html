@@ -1,0 +1,102 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Parse OPML XML files and store in globals.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global string $opml<br/>
+ */<br/>
+global $opml;<br/>
+<br/>
+/**<br/>
+ * XML callback function for the start of a new XML tag.<br/>
+ *<br/>
+ * @since 0.71<br/>
+ * @access private<br/>
+ *<br/>
+ * @global array $names<br/>
+ * @global array $urls<br/>
+ * @global array $targets<br/>
+ * @global array $descriptions<br/>
+ * @global array $feeds<br/>
+ *<br/>
+ * @param mixed $parser XML Parser resource.<br/>
+ * @param string $tagName XML element name.<br/>
+ * @param array $attrs XML element attributes.<br/>
+ */<br/>
+function startElement( $parser, $tagName, $attrs ) {<br/>
+&nbsp;&nbsp;&nbsp;global $names, $urls, $targets, $descriptions, $feeds;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;OUTLINE&#39; === $tagName ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$name = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $attrs[&#39;TEXT&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$name = $attrs[&#39;TEXT&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $attrs[&#39;TITLE&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$name = $attrs[&#39;TITLE&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $attrs[&#39;URL&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url = $attrs[&#39;URL&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $attrs[&#39;HTMLURL&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url = $attrs[&#39;HTMLURL&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Save the data away.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$names[]        = $name;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$urls[]         = $url;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$targets[]      = isset( $attrs[&#39;TARGET&#39;] ) ? $attrs[&#39;TARGET&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$feeds[]        = isset( $attrs[&#39;XMLURL&#39;] ) ? $attrs[&#39;XMLURL&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$descriptions[] = isset( $attrs[&#39;DESCRIPTION&#39;] ) ? $attrs[&#39;DESCRIPTION&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} // End if outline.<br/>
+}<br/>
+<br/>
+/**<br/>
+ * XML callback function that is called at the end of a XML tag.<br/>
+ *<br/>
+ * @since 0.71<br/>
+ * @access private<br/>
+ *<br/>
+ * @param mixed $parser XML Parser resource.<br/>
+ * @param string $tagName XML tag name.<br/>
+ */<br/>
+function endElement( $parser, $tagName ) {<br/>
+&nbsp;&nbsp;&nbsp;// Nothing to do.<br/>
+}<br/>
+<br/>
+// Create an XML parser<br/>
+if ( ! function_exists( &#39;xml_parser_create&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;trigger_error( __( &quot;PHP&#39;s XML extension is not available. Please contact your hosting provider to enable PHP&#39;s XML extension.&quot; ) );<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &quot;PHP&#39;s XML extension is not available. Please contact your hosting provider to enable PHP&#39;s XML extension.&quot; ) );<br/>
+}<br/>
+<br/>
+$xml_parser = xml_parser_create();<br/>
+<br/>
+// Set the functions to handle opening and closing tags<br/>
+xml_set_element_handler( $xml_parser, &#39;startElement&#39;, &#39;endElement&#39; );<br/>
+<br/>
+if ( ! xml_parse( $xml_parser, $opml, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: error message, 2: line number */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;XML Error: %1$s at line %2$s&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xml_error_string( xml_get_error_code( $xml_parser ) ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xml_get_current_line_number( $xml_parser )<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+// Free up memory used by the XML parser<br/>
+xml_parser_free( $xml_parser );</body></html>

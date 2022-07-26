@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Multisite delete site panel.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Multisite<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Multisite support is not enabled.&#39; ) );<br/>
+}<br/>
+<br/>
+if ( ! current_user_can( &#39;delete_site&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to delete this site.&#39; ) );<br/>
+}<br/>
+<br/>
+if ( isset( $_GET[&#39;h&#39;] ) &amp;&amp; $_GET[&#39;h&#39;] != &#39;&#39; &amp;&amp; get_option( &#39;delete_blog_hash&#39; ) != false ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( hash_equals( get_option( &#39;delete_blog_hash&#39; ), $_GET[&#39;h&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wpmu_delete_blog( get_current_blog_id() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( sprintf( __( &#39;Thank you for using %s, your site has been deleted. Happy trails to you until we meet again.&#39; ), get_network()&ndash;&gt;site_name ) );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, the link you clicked is stale. Please select another option.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+$blog = get_site();<br/>
+$user = wp_get_current_user();<br/>
+<br/>
+$title       = __( &#39;Delete Site&#39; );<br/>
+$parent_file = &#39;tools.php&#39;;<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+echo &#39;&lt;div class=&quot;wrap&quot;&gt;&#39;;<br/>
+echo &#39;&lt;h1&gt;&#39; . esc_html( $title ) . &#39;&lt;/h1&gt;&#39;;<br/>
+<br/>
+if ( isset( $_POST[&#39;action&#39;] ) &amp;&amp; $_POST[&#39;action&#39;] == &#39;deleteblog&#39; &amp;&amp; isset( $_POST[&#39;confirmdelete&#39;] ) &amp;&amp; $_POST[&#39;confirmdelete&#39;] == &#39;1&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;delete&ndash;blog&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$hash = wp_generate_password( 20, false );<br/>
+&nbsp;&nbsp;&nbsp;update_option( &#39;delete_blog_hash&#39;, $hash );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$url_delete = esc_url( admin_url( &#39;ms&ndash;delete&ndash;site.php?h=&#39; . $hash ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$switched_locale = switch_to_locale( get_locale() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/* translators: Do not translate USERNAME, URL_DELETE, SITE_NAME: those are placeholders. */<br/>
+&nbsp;&nbsp;&nbsp;$content = __(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;Howdy ###USERNAME###,<br/>
+<br/>
+You recently clicked the &#39;Delete Site&#39; link on your site and filled in a<br/>
+form on that page.<br/>
+<br/>
+If you really want to delete your site, click the link below. You will not<br/>
+be asked to confirm again so only click this link if you are absolutely certain:<br/>
+###URL_DELETE###<br/>
+<br/>
+If you delete your site, please consider opening a new site here<br/>
+some time in the future! (But remember your current site and username<br/>
+are gone forever.)<br/>
+<br/>
+Thanks for using the site,<br/>
+Webmaster<br/>
+###SITE_NAME###&quot;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the email content sent when a site in a Multisite network is deleted.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $content The email content that will be sent to the user who deleted a site in a Multisite network.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$content = apply_filters( &#39;delete_site_email_content&#39;, $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$content = str_replace( &#39;###USERNAME###&#39;, $user&ndash;&gt;user_login, $content );<br/>
+&nbsp;&nbsp;&nbsp;$content = str_replace( &#39;###URL_DELETE###&#39;, $url_delete, $content );<br/>
+&nbsp;&nbsp;&nbsp;$content = str_replace( &#39;###SITE_NAME###&#39;, get_network()&ndash;&gt;site_name, $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_mail( get_option( &#39;admin_email&#39; ), &#39;[ &#39; . wp_specialchars_decode( get_option( &#39;blogname&#39; ) ) . &#39; ] &#39; . __( &#39;Delete My Site&#39; ), $content );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $switched_locale ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;restore_previous_locale();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Thank you. Please check your email for a link to confirm your action. Your site will not be deleted until this link is clicked.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php printf( __( &#39;If you do not want to use your %s site any more, you can delete it using the form below. When you click &lt;strong&gt;Delete My Site Permanently&lt;/strong&gt; you will be sent an email with a link in it. Click on this link to delete your site.&#39; ), get_network()&ndash;&gt;site_name ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Remember, once deleted your site cannot be restored.&#39; ); ?&gt;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;form method=&quot;post&quot; name=&quot;deletedirect&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( &#39;delete&ndash;blog&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;deleteblog&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;input id=&quot;confirmdelete&quot; type=&quot;checkbox&quot; name=&quot;confirmdelete&quot; value=&quot;1&quot; /&gt; &lt;label for=&quot;confirmdelete&quot;&gt;&lt;strong&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site address */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &quot;I&#39;m sure I want to permanently disable my site, and I am aware I can never get it back or use %s again.&quot; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog&ndash;&gt;domain . $blog&ndash;&gt;path<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/strong&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( __( &#39;Delete My Site Permanently&#39; ) ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+echo &#39;&lt;/div&gt;&#39;;<br/>
+<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );</body></html>

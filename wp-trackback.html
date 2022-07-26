@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Handle Trackbacks and Pingbacks Sent to WordPress<br/>
+ *<br/>
+ * @since 0.71<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Trackbacks<br/>
+ */<br/>
+<br/>
+if ( empty( $wp ) ) {<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;wp( array( &#39;tb&#39; =&gt; &#39;1&#39; ) );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Response to a trackback.<br/>
+ *<br/>
+ * Responds with an error or success XML message.<br/>
+ *<br/>
+ * @since 0.71<br/>
+ *<br/>
+ * @param mixed  $error         Whether there was an error.<br/>
+ *                              Default &#39;0&#39;. Accepts &#39;0&#39; or &#39;1&#39;, true or false.<br/>
+ * @param string $error_message Error message if an error occurred.<br/>
+ */<br/>
+function trackback_response( $error = 0, $error_message = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;header( &#39;Content&ndash;Type: text/xml; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;if ( $error ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf&ndash;8&quot;?&#39; . &quot;&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;response&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;error&gt;1&lt;/error&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;message&gt;$error_message&lt;/message&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/response&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die();<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf&ndash;8&quot;?&#39; . &quot;&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;response&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;error&gt;0&lt;/error&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/response&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+// Trackback is done by a POST.<br/>
+$request_array = &#39;HTTP_POST_VARS&#39;;<br/>
+<br/>
+if ( ! isset( $_GET[&#39;tb_id&#39;] ) || ! $_GET[&#39;tb_id&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;$tb_id = explode( &#39;/&#39;, $_SERVER[&#39;REQUEST_URI&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;$tb_id = intval( $tb_id[ count( $tb_id ) &ndash; 1 ] );<br/>
+}<br/>
+<br/>
+$tb_url  = isset( $_POST[&#39;url&#39;] ) ? $_POST[&#39;url&#39;] : &#39;&#39;;<br/>
+$charset = isset( $_POST[&#39;charset&#39;] ) ? $_POST[&#39;charset&#39;] : &#39;&#39;;<br/>
+<br/>
+// These three are stripslashed here so they can be properly escaped after mb_convert_encoding().<br/>
+$title     = isset( $_POST[&#39;title&#39;] ) ? wp_unslash( $_POST[&#39;title&#39;] ) : &#39;&#39;;<br/>
+$excerpt   = isset( $_POST[&#39;excerpt&#39;] ) ? wp_unslash( $_POST[&#39;excerpt&#39;] ) : &#39;&#39;;<br/>
+$blog_name = isset( $_POST[&#39;blog_name&#39;] ) ? wp_unslash( $_POST[&#39;blog_name&#39;] ) : &#39;&#39;;<br/>
+<br/>
+if ( $charset ) {<br/>
+&nbsp;&nbsp;&nbsp;$charset = str_replace( array( &#39;,&#39;, &#39; &#39; ), &#39;&#39;, strtoupper( trim( $charset ) ) );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$charset = &#39;ASCII, UTF&ndash;8, ISO&ndash;8859&ndash;1, JIS, EUC&ndash;JP, SJIS&#39;;<br/>
+}<br/>
+<br/>
+// No valid uses for UTF&ndash;7.<br/>
+if ( false !== strpos( $charset, &#39;UTF&ndash;7&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die;<br/>
+}<br/>
+<br/>
+// For international trackbacks.<br/>
+if ( function_exists( &#39;mb_convert_encoding&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$title     = mb_convert_encoding( $title, get_option( &#39;blog_charset&#39; ), $charset );<br/>
+&nbsp;&nbsp;&nbsp;$excerpt   = mb_convert_encoding( $excerpt, get_option( &#39;blog_charset&#39; ), $charset );<br/>
+&nbsp;&nbsp;&nbsp;$blog_name = mb_convert_encoding( $blog_name, get_option( &#39;blog_charset&#39; ), $charset );<br/>
+}<br/>
+<br/>
+// Now that mb_convert_encoding() has been given a swing, we need to escape these three.<br/>
+$title     = wp_slash( $title );<br/>
+$excerpt   = wp_slash( $excerpt );<br/>
+$blog_name = wp_slash( $blog_name );<br/>
+<br/>
+if ( is_single() || is_page() ) {<br/>
+&nbsp;&nbsp;&nbsp;$tb_id = $posts[0]&ndash;&gt;ID;<br/>
+}<br/>
+<br/>
+if ( ! isset( $tb_id ) || ! intval( $tb_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;trackback_response( 1, __( &#39;I really need an ID for this to work.&#39; ) );<br/>
+}<br/>
+<br/>
+if ( empty( $title ) &amp;&amp; empty( $tb_url ) &amp;&amp; empty( $blog_name ) ) {<br/>
+&nbsp;&nbsp;&nbsp;// If it doesn&#39;t look like a trackback at all.<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( get_permalink( $tb_id ) );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+if ( ! empty( $tb_url ) &amp;&amp; ! empty( $title ) ) {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires before the trackback is added to a post.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.7.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param int    $tb_id     Post ID related to the trackback.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $tb_url    Trackback URL.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $charset   Character Set.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $title     Trackback Title.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $excerpt   Trackback Excerpt.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $blog_name Blog Name.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;pre_trackback_post&#39;, $tb_id, $tb_url, $charset, $title, $excerpt, $blog_name );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;header( &#39;Content&ndash;Type: text/xml; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! pings_open( $tb_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trackback_response( 1, __( &#39;Sorry, trackbacks are closed for this item.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$title   = wp_html_excerpt( $title, 250, &#39;&amp;#8230;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$excerpt = wp_html_excerpt( $excerpt, 252, &#39;&amp;#8230;&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$comment_post_ID      = (int) $tb_id;<br/>
+&nbsp;&nbsp;&nbsp;$comment_author       = $blog_name;<br/>
+&nbsp;&nbsp;&nbsp;$comment_author_email = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$comment_author_url   = $tb_url;<br/>
+&nbsp;&nbsp;&nbsp;$comment_content      = &quot;&lt;strong&gt;$title&lt;/strong&gt;\n\n$excerpt&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$comment_type         = &#39;trackback&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$dupe = $wpdb&ndash;&gt;get_results( $wpdb&ndash;&gt;prepare( &quot;SELECT * FROM $wpdb&ndash;&gt;comments WHERE comment_post_ID = %d AND comment_author_url = %s&quot;, $comment_post_ID, $comment_author_url ) );<br/>
+&nbsp;&nbsp;&nbsp;if ( $dupe ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trackback_response( 1, __( &#39;We already have a ping from that URL for this post.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$commentdata = compact( &#39;comment_post_ID&#39;, &#39;comment_author&#39;, &#39;comment_author_email&#39;, &#39;comment_author_url&#39;, &#39;comment_content&#39;, &#39;comment_type&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$result = wp_new_comment( $commentdata );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( is_wp_error( $result ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trackback_response( 1, $result&ndash;&gt;get_error_message() );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$trackback_id = $wpdb&ndash;&gt;insert_id;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires after a trackback is added to a post.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 1.2.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param int $trackback_id Trackback ID.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;trackback_post&#39;, $trackback_id );<br/>
+&nbsp;&nbsp;&nbsp;trackback_response( 0 );<br/>
+}</body></html>

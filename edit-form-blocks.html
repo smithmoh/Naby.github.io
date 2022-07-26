@@ -1,0 +1,439 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * The Block Editor page.<br/>
+ *<br/>
+ * @since 5.0.0<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+// don&#39;t load directly<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die( &#39;&ndash;1&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global string       $post_type<br/>
+ * @global WP_Post_Type $post_type_object<br/>
+ * @global WP_Post      $post<br/>
+ * @global string       $title<br/>
+ * @global array        $editor_styles<br/>
+ * @global array        $wp_meta_boxes<br/>
+ */<br/>
+global $post_type, $post_type_object, $post, $title, $editor_styles, $wp_meta_boxes;<br/>
+<br/>
+// Flag that we&#39;re loading the block editor.<br/>
+$current_screen = get_current_screen();<br/>
+$current_screen&ndash;&gt;is_block_editor( true );<br/>
+<br/>
+/*<br/>
+ * Emoji replacement is disabled for now, until it plays nicely with React.<br/>
+ */<br/>
+remove_action( &#39;admin_print_scripts&#39;, &#39;print_emoji_detection_script&#39; );<br/>
+<br/>
+wp_enqueue_script( &#39;heartbeat&#39; );<br/>
+wp_enqueue_script( &#39;wp&ndash;edit&ndash;post&#39; );<br/>
+wp_enqueue_script( &#39;wp&ndash;format&ndash;library&#39; );<br/>
+<br/>
+$rest_base = ! empty( $post_type_object&ndash;&gt;rest_base ) ? $post_type_object&ndash;&gt;rest_base : $post_type_object&ndash;&gt;name;<br/>
+<br/>
+// Preload common data.<br/>
+$preload_paths = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;/&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;/wp/v2/types?context=edit&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;/wp/v2/taxonomies?per_page=&ndash;1&amp;context=edit&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;/wp/v2/themes?status=active&#39;,<br/>
+&nbsp;&nbsp;&nbsp;sprintf( &#39;/wp/v2/%s/%s?context=edit&#39;, $rest_base, $post&ndash;&gt;ID ),<br/>
+&nbsp;&nbsp;&nbsp;sprintf( &#39;/wp/v2/types/%s?context=edit&#39;, $post_type ),<br/>
+&nbsp;&nbsp;&nbsp;sprintf( &#39;/wp/v2/users/me?post_type=%s&amp;context=edit&#39;, $post_type ),<br/>
+&nbsp;&nbsp;&nbsp;array( &#39;/wp/v2/media&#39;, &#39;OPTIONS&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;array( &#39;/wp/v2/blocks&#39;, &#39;OPTIONS&#39; ),<br/>
+);<br/>
+<br/>
+/**<br/>
+ * Preload common data by specifying an array of REST API paths that will be preloaded.<br/>
+ *<br/>
+ * Filters the array of paths that will be preloaded.<br/>
+ *<br/>
+ * @since 5.0.0<br/>
+ *<br/>
+ * @param array  $preload_paths Array of paths to preload.<br/>
+ * @param object $post          The post resource data.<br/>
+ */<br/>
+$preload_paths = apply_filters( &#39;block_editor_preload_paths&#39;, $preload_paths, $post );<br/>
+<br/>
+/*<br/>
+ * Ensure the global $post remains the same after API data is preloaded.<br/>
+ * Because API preloading can call the_content and other filters, plugins<br/>
+ * can unexpectedly modify $post.<br/>
+ */<br/>
+$backup_global_post = $post;<br/>
+<br/>
+$preload_data = array_reduce(<br/>
+&nbsp;&nbsp;&nbsp;$preload_paths,<br/>
+&nbsp;&nbsp;&nbsp;&#39;rest_preload_api_request&#39;,<br/>
+&nbsp;&nbsp;&nbsp;array()<br/>
+);<br/>
+<br/>
+// Restore the global $post as it was before API preloading.<br/>
+$post = $backup_global_post;<br/>
+<br/>
+wp_add_inline_script(<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;api&ndash;fetch&#39;,<br/>
+&nbsp;&nbsp;&nbsp;sprintf( &#39;wp.apiFetch.use( wp.apiFetch.createPreloadingMiddleware( %s ) );&#39;, wp_json_encode( $preload_data ) ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;after&#39;<br/>
+);<br/>
+<br/>
+wp_add_inline_script(<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;blocks&#39;,<br/>
+&nbsp;&nbsp;&nbsp;sprintf( &#39;wp.blocks.setCategories( %s );&#39;, wp_json_encode( get_block_categories( $post ) ) ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;after&#39;<br/>
+);<br/>
+<br/>
+/*<br/>
+ * Assign initial edits, if applicable. These are not initially assigned to the persisted post,<br/>
+ * but should be included in its save payload.<br/>
+ */<br/>
+$initial_edits = null;<br/>
+$is_new_post   = false;<br/>
+if ( &#39;auto&ndash;draft&#39; === $post&ndash;&gt;post_status ) {<br/>
+&nbsp;&nbsp;&nbsp;$is_new_post = true;<br/>
+&nbsp;&nbsp;&nbsp;// Override &quot;(Auto Draft)&quot; new post default title with empty string, or filtered value.<br/>
+&nbsp;&nbsp;&nbsp;$initial_edits = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; $post&ndash;&gt;post_title,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt; $post&ndash;&gt;post_content,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;excerpt&#39; =&gt; $post&ndash;&gt;post_excerpt,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+// Preload server&ndash;registered block schemas.<br/>
+wp_add_inline_script(<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;blocks&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp.blocks.unstable__bootstrapServerSideBlockDefinitions(&#39; . wp_json_encode( get_block_editor_server_block_settings() ) . &#39;);&#39;<br/>
+);<br/>
+<br/>
+// Get admin url for handling meta boxes.<br/>
+$meta_box_url = admin_url( &#39;post.php&#39; );<br/>
+$meta_box_url = add_query_arg(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post&#39;                  =&gt; $post&ndash;&gt;ID,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;action&#39;                =&gt; &#39;edit&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;meta&ndash;box&ndash;loader&#39;       =&gt; true,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;meta&ndash;box&ndash;loader&ndash;nonce&#39; =&gt; wp_create_nonce( &#39;meta&ndash;box&ndash;loader&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;$meta_box_url<br/>
+);<br/>
+wp_localize_script( &#39;wp&ndash;editor&#39;, &#39;_wpMetaBoxUrl&#39;, $meta_box_url );<br/>
+<br/>
+<br/>
+/*<br/>
+ * Initialize the editor.<br/>
+ */<br/>
+<br/>
+$align_wide    = get_theme_support( &#39;align&ndash;wide&#39; );<br/>
+$color_palette = current( (array) get_theme_support( &#39;editor&ndash;color&ndash;palette&#39; ) );<br/>
+$font_sizes    = current( (array) get_theme_support( &#39;editor&ndash;font&ndash;sizes&#39; ) );<br/>
+<br/>
+/**<br/>
+ * Filters the allowed block types for the editor, defaulting to true (all<br/>
+ * block types supported).<br/>
+ *<br/>
+ * @since 5.0.0<br/>
+ *<br/>
+ * @param bool|array $allowed_block_types Array of block type slugs, or<br/>
+ *                                        boolean to enable/disable all.<br/>
+ * @param object $post                    The post resource data.<br/>
+ */<br/>
+$allowed_block_types = apply_filters( &#39;allowed_block_types&#39;, true, $post );<br/>
+<br/>
+// Get all available templates for the post/page attributes meta&ndash;box.<br/>
+// The &quot;Default template&quot; array element should only be added if the array is<br/>
+// not empty so we do not trigger the template select element without any options<br/>
+// besides the default value.<br/>
+$available_templates = wp_get_theme()&ndash;&gt;get_page_templates( get_post( $post&ndash;&gt;ID ) );<br/>
+$available_templates = ! empty( $available_templates ) ? array_merge(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&#39; =&gt; apply_filters( &#39;default_page_template_title&#39;, __( &#39;Default template&#39; ), &#39;rest&ndash;api&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;$available_templates<br/>
+) : $available_templates;<br/>
+<br/>
+// Media settings.<br/>
+$max_upload_size = wp_max_upload_size();<br/>
+if ( ! $max_upload_size ) {<br/>
+&nbsp;&nbsp;&nbsp;$max_upload_size = 0;<br/>
+}<br/>
+<br/>
+// Editor Styles.<br/>
+$styles = array(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;css&#39; =&gt; file_get_contents(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ABSPATH . WPINC . &#39;/css/dist/editor/editor&ndash;styles.css&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;),<br/>
+);<br/>
+<br/>
+/* Translators: Use this to specify the CSS font family for the default font */<br/>
+$locale_font_family = esc_html_x( &#39;Noto Serif&#39;, &#39;CSS Font Family for Editor Font&#39; );<br/>
+$styles[]           = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;css&#39; =&gt; &quot;body { font&ndash;family: &#39;$locale_font_family&#39; }&quot;,<br/>
+);<br/>
+<br/>
+if ( $editor_styles &amp;&amp; current_theme_supports( &#39;editor&ndash;styles&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $editor_styles as $style ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( preg_match( &#39;~^(https?:)?//~&#39;, $style ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$response = wp_remote_get( $style );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $response ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$styles[] = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;css&#39; =&gt; wp_remote_retrieve_body( $response ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$file = get_theme_file_path( $style );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_file( $file ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$styles[] = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;css&#39;     =&gt; file_get_contents( $file ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;baseURL&#39; =&gt; get_theme_file_uri( $style ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+// Image sizes.<br/>
+<br/>
+/** This filter is documented in wp&ndash;admin/includes/media.php */<br/>
+$image_size_names = apply_filters(<br/>
+&nbsp;&nbsp;&nbsp;&#39;image_size_names_choose&#39;,<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;thumbnail&#39; =&gt; __( &#39;Thumbnail&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;medium&#39;    =&gt; __( &#39;Medium&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;large&#39;     =&gt; __( &#39;Large&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;full&#39;      =&gt; __( &#39;Full Size&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+$available_image_sizes = array();<br/>
+foreach ( $image_size_names as $image_size_slug =&gt; $image_size_name ) {<br/>
+&nbsp;&nbsp;&nbsp;$available_image_sizes[] = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;slug&#39; =&gt; $image_size_slug,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;name&#39; =&gt; $image_size_name,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+// Lock settings.<br/>
+$user_id = wp_check_post_lock( $post&ndash;&gt;ID );<br/>
+if ( $user_id ) {<br/>
+&nbsp;&nbsp;&nbsp;$locked = false;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/includes/post.php */<br/>
+&nbsp;&nbsp;&nbsp;if ( apply_filters( &#39;show_post_locked_dialog&#39;, true, $post, $user_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$locked = true;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$user_details = null;<br/>
+&nbsp;&nbsp;&nbsp;if ( $locked ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user         = get_userdata( $user_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_details = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;name&#39; =&gt; $user&ndash;&gt;display_name,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$avatar       = get_avatar_url( $user_id, array( &#39;size&#39; =&gt; 64 ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$lock_details = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;isLocked&#39; =&gt; $locked,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;user&#39;     =&gt; $user_details,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;// Lock the post.<br/>
+&nbsp;&nbsp;&nbsp;$active_post_lock = wp_set_post_lock( $post&ndash;&gt;ID );<br/>
+&nbsp;&nbsp;&nbsp;$lock_details     = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;isLocked&#39;       =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;activePostLock&#39; =&gt; esc_attr( implode( &#39;:&#39;, $active_post_lock ) ),<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Filters the body placeholder text.<br/>
+ *<br/>
+ * @since 5.0.0<br/>
+ *<br/>
+ * @param string  $text Placeholder text. Default &#39;Start writing or type / to choose a block&#39;.<br/>
+ * @param WP_Post $post Post object.<br/>
+ */<br/>
+$body_placeholder = apply_filters( &#39;write_your_story&#39;, __( &#39;Start writing or type / to choose a block&#39; ), $post );<br/>
+<br/>
+$editor_settings = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;alignWide&#39;              =&gt; $align_wide,<br/>
+&nbsp;&nbsp;&nbsp;&#39;availableTemplates&#39;     =&gt; $available_templates,<br/>
+&nbsp;&nbsp;&nbsp;&#39;allowedBlockTypes&#39;      =&gt; $allowed_block_types,<br/>
+&nbsp;&nbsp;&nbsp;&#39;disableCustomColors&#39;    =&gt; get_theme_support( &#39;disable&ndash;custom&ndash;colors&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;disableCustomFontSizes&#39; =&gt; get_theme_support( &#39;disable&ndash;custom&ndash;font&ndash;sizes&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;disablePostFormats&#39;     =&gt; ! current_theme_supports( &#39;post&ndash;formats&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;admin/edit&ndash;form&ndash;advanced.php */<br/>
+&nbsp;&nbsp;&nbsp;&#39;titlePlaceholder&#39;       =&gt; apply_filters( &#39;enter_title_here&#39;, __( &#39;Add title&#39; ), $post ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;bodyPlaceholder&#39;        =&gt; $body_placeholder,<br/>
+&nbsp;&nbsp;&nbsp;&#39;isRTL&#39;                  =&gt; is_rtl(),<br/>
+&nbsp;&nbsp;&nbsp;&#39;autosaveInterval&#39;       =&gt; AUTOSAVE_INTERVAL,<br/>
+&nbsp;&nbsp;&nbsp;&#39;maxUploadFileSize&#39;      =&gt; $max_upload_size,<br/>
+&nbsp;&nbsp;&nbsp;&#39;allowedMimeTypes&#39;       =&gt; get_allowed_mime_types(),<br/>
+&nbsp;&nbsp;&nbsp;&#39;styles&#39;                 =&gt; $styles,<br/>
+&nbsp;&nbsp;&nbsp;&#39;imageSizes&#39;             =&gt; $available_image_sizes,<br/>
+&nbsp;&nbsp;&nbsp;&#39;richEditingEnabled&#39;     =&gt; user_can_richedit(),<br/>
+&nbsp;&nbsp;&nbsp;&#39;postLock&#39;               =&gt; $lock_details,<br/>
+&nbsp;&nbsp;&nbsp;&#39;postLockUtils&#39;          =&gt; array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;nonce&#39;       =&gt; wp_create_nonce( &#39;lock&ndash;post_&#39; . $post&ndash;&gt;ID ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;unlockNonce&#39; =&gt; wp_create_nonce( &#39;update&ndash;post_&#39; . $post&ndash;&gt;ID ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;ajaxUrl&#39;     =&gt; admin_url( &#39;admin&ndash;ajax.php&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;),<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Whether or not to load the &#39;postcustom&#39; meta box is stored as a user meta<br/>
+&nbsp;&nbsp;&nbsp;// field so that we&#39;re not always loading its assets.<br/>
+&nbsp;&nbsp;&nbsp;&#39;enableCustomFields&#39;     =&gt; (bool) get_user_meta( get_current_user_id(), &#39;enable_custom_fields&#39;, true ),<br/>
+);<br/>
+<br/>
+$autosave = wp_get_post_autosave( $post_ID );<br/>
+if ( $autosave ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( mysql2date( &#39;U&#39;, $autosave&ndash;&gt;post_modified_gmt, false ) &gt; mysql2date( &#39;U&#39;, $post&ndash;&gt;post_modified_gmt, false ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$editor_settings[&#39;autosave&#39;] = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;editLink&#39; =&gt; get_edit_post_link( $autosave&ndash;&gt;ID ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_delete_post_revision( $autosave&ndash;&gt;ID );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( false !== $color_palette ) {<br/>
+&nbsp;&nbsp;&nbsp;$editor_settings[&#39;colors&#39;] = $color_palette;<br/>
+}<br/>
+<br/>
+if ( false !== $font_sizes ) {<br/>
+&nbsp;&nbsp;&nbsp;$editor_settings[&#39;fontSizes&#39;] = $font_sizes;<br/>
+}<br/>
+<br/>
+if ( ! empty( $post_type_object&ndash;&gt;template ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$editor_settings[&#39;template&#39;]     = $post_type_object&ndash;&gt;template;<br/>
+&nbsp;&nbsp;&nbsp;$editor_settings[&#39;templateLock&#39;] = ! empty( $post_type_object&ndash;&gt;template_lock ) ? $post_type_object&ndash;&gt;template_lock : false;<br/>
+}<br/>
+<br/>
+// If there&#39;s no template set on a new post, use the post format, instead.<br/>
+if ( $is_new_post &amp;&amp; ! isset( $editor_settings[&#39;template&#39;] ) &amp;&amp; &#39;post&#39; === $post&ndash;&gt;post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;$post_format = get_post_format( $post );<br/>
+&nbsp;&nbsp;&nbsp;if ( in_array( $post_format, array( &#39;audio&#39;, &#39;gallery&#39;, &#39;image&#39;, &#39;quote&#39;, &#39;video&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$editor_settings[&#39;template&#39;] = array( array( &quot;core/$post_format&quot; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Scripts<br/>
+ */<br/>
+wp_enqueue_media(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;post&#39; =&gt; $post&ndash;&gt;ID,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+wp_tinymce_inline_scripts();<br/>
+wp_enqueue_editor();<br/>
+<br/>
+/**<br/>
+ * Styles<br/>
+ */<br/>
+wp_enqueue_style( &#39;wp&ndash;edit&ndash;post&#39; );<br/>
+wp_enqueue_style( &#39;wp&ndash;format&ndash;library&#39; );<br/>
+<br/>
+/**<br/>
+ * Fires after block assets have been enqueued for the editing interface.<br/>
+ *<br/>
+ * Call `add_action` on any hook before &#39;admin_enqueue_scripts&#39;.<br/>
+ *<br/>
+ * In the function call you supply, simply use `wp_enqueue_script` and<br/>
+ * `wp_enqueue_style` to add your functionality to the block editor.<br/>
+ *<br/>
+ * @since 5.0.0<br/>
+ */<br/>
+do_action( &#39;enqueue_block_editor_assets&#39; );<br/>
+<br/>
+// In order to duplicate classic meta box behaviour, we need to run the classic meta box actions.<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/meta&ndash;boxes.php&#39; );<br/>
+register_and_do_post_meta_boxes( $post );<br/>
+<br/>
+// Check if the Custom Fields meta box has been removed at some point.<br/>
+$core_meta_boxes = $wp_meta_boxes[ $current_screen&ndash;&gt;id ][&#39;normal&#39;][&#39;core&#39;];<br/>
+if ( ! isset( $core_meta_boxes[&#39;postcustom&#39;] ) || ! $core_meta_boxes[&#39;postcustom&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;unset( $editor_settings[&#39;enableCustomFields&#39;] );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Filters the settings to pass to the block editor.<br/>
+ *<br/>
+ * @since 5.0.0<br/>
+ *<br/>
+ * @param array   $editor_settings Default editor settings.<br/>
+ * @param WP_Post $post            Post being edited.<br/>
+ */<br/>
+$editor_settings = apply_filters( &#39;block_editor_settings&#39;, $editor_settings, $post );<br/>
+<br/>
+$init_script = &lt;&lt;&lt;JS<br/>
+( function() {<br/>
+&nbsp;&nbsp;&nbsp;window._wpLoadBlockEditor = new Promise( function( resolve ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp.domReady( function() {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resolve( wp.editPost.initializeEditor( &#39;editor&#39;, &quot;%s&quot;, %d, %s, %s ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} );<br/>
+&nbsp;&nbsp;&nbsp;} );<br/>
+} )();<br/>
+JS;<br/>
+<br/>
+$script = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;$init_script,<br/>
+&nbsp;&nbsp;&nbsp;$post&ndash;&gt;post_type,<br/>
+&nbsp;&nbsp;&nbsp;$post&ndash;&gt;ID,<br/>
+&nbsp;&nbsp;&nbsp;wp_json_encode( $editor_settings ),<br/>
+&nbsp;&nbsp;&nbsp;wp_json_encode( $initial_edits )<br/>
+);<br/>
+wp_add_inline_script( &#39;wp&ndash;edit&ndash;post&#39;, $script );<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;block&ndash;editor&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h1 class=&quot;screen&ndash;reader&ndash;text hide&ndash;if&ndash;no&ndash;js&quot;&gt;&lt;?php echo esc_html( $title ); ?&gt;&lt;/h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;editor&quot; class=&quot;block&ndash;editor__container hide&ndash;if&ndash;no&ndash;js&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;metaboxes&quot; class=&quot;hidden&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php the_block_editor_meta_boxes(); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php // JavaScript is disabled. ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;wrap hide&ndash;if&ndash;js block&ndash;editor&ndash;no&ndash;js&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h1 class=&quot;wp&ndash;heading&ndash;inline&quot;&gt;&lt;?php echo esc_html( $title ); ?&gt;&lt;/h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;notice notice&ndash;error notice&ndash;alt&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: Classic Editor plugin URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;The block editor requires JavaScript. Please enable JavaScript in your browser settings, or try the &lt;a href=&quot;%s&quot;&gt;Classic Editor plugin&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;https://wordpress.org/plugins/classic&ndash;editor/&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the message displayed in the block editor interface when JavaScript is<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * not enabled in the browser.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 5.0.3<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string  $message The message being displayed.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param WP_Post $post    The post being edited.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;block_editor_no_javascript_message&#39;, $message, $post );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&lt;/div&gt;</body></html>

@@ -1,0 +1,406 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Administration Bootstrap<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * In WordPress Administration Screens<br/>
+ *<br/>
+ * @since 2.3.2<br/>
+ */<br/>
+if ( ! defined( &#39;WP_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_ADMIN&#39;, true );<br/>
+}<br/>
+<br/>
+if ( ! defined( &#39;WP_NETWORK_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_NETWORK_ADMIN&#39;, false );<br/>
+}<br/>
+<br/>
+if ( ! defined( &#39;WP_USER_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_USER_ADMIN&#39;, false );<br/>
+}<br/>
+<br/>
+if ( ! WP_NETWORK_ADMIN &amp;&amp; ! WP_USER_ADMIN ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_BLOG_ADMIN&#39;, true );<br/>
+}<br/>
+<br/>
+if ( isset( $_GET[&#39;import&#39;] ) &amp;&amp; ! defined( &#39;WP_LOAD_IMPORTERS&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_LOAD_IMPORTERS&#39;, true );<br/>
+}<br/>
+<br/>
+require_once( dirname( dirname( __FILE__ ) ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+if ( get_option( &#39;db_upgraded&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;flush_rewrite_rules();<br/>
+&nbsp;&nbsp;&nbsp;update_option( &#39;db_upgraded&#39;, false );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires on the next page load after a successful DB upgrade.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.8.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;after_db_upgrade&#39; );<br/>
+} elseif ( get_option( &#39;db_version&#39; ) != $wp_db_version &amp;&amp; empty( $_POST ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;upgrade.php?_wp_http_referer=&#39; . urlencode( wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters whether to attempt to perform the multisite DB upgrade routine.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * In single site, the user would be redirected to wp&ndash;admin/upgrade.php.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * In multisite, the DB upgrade routine is automatically fired, but only<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * when this filter returns true.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * If the network is 50 sites or less, it will run every time. Otherwise,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * it will throttle itself to reduce load.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param bool $do_mu_upgrade Whether to perform the Multisite upgrade routine. Default true.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( apply_filters( &#39;do_mu_upgrade&#39;, true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$c = get_blog_count();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * If there are 50 or fewer sites, run every time. Otherwise, throttle to reduce load:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * attempt to do no more than threshold value, with some +/&ndash; allowed.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $c &lt;= 50 || ( $c &gt; 50 &amp;&amp; mt_rand( 0, (int) ( $c / 50 ) ) == 1 ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once( ABSPATH . WPINC . &#39;/http.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$response = wp_remote_get(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admin_url( &#39;upgrade.php?step=1&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;timeout&#39;     =&gt; 120,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;httpversion&#39; =&gt; &#39;1.1&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;admin/network/upgrade.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;after_mu_upgrade&#39;, $response );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $response );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $c );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/admin.php&#39; );<br/>
+<br/>
+auth_redirect();<br/>
+<br/>
+// Schedule trash collection<br/>
+if ( ! wp_next_scheduled( &#39;wp_scheduled_delete&#39; ) &amp;&amp; ! wp_installing() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_schedule_event( time(), &#39;daily&#39;, &#39;wp_scheduled_delete&#39; );<br/>
+}<br/>
+<br/>
+// Schedule Transient cleanup.<br/>
+if ( ! wp_next_scheduled( &#39;delete_expired_transients&#39; ) &amp;&amp; ! wp_installing() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_schedule_event( time(), &#39;daily&#39;, &#39;delete_expired_transients&#39; );<br/>
+}<br/>
+<br/>
+set_screen_options();<br/>
+<br/>
+$date_format = __( &#39;F j, Y&#39; );<br/>
+$time_format = __( &#39;g:i a&#39; );<br/>
+<br/>
+wp_enqueue_script( &#39;common&#39; );<br/>
+<br/>
+/**<br/>
+ * $pagenow is set in vars.php<br/>
+ * $wp_importers is sometimes set in wp&ndash;admin/includes/import.php<br/>
+ * The remaining variables are imported as globals elsewhere, declared as globals here<br/>
+ *<br/>
+ * @global string $pagenow<br/>
+ * @global array  $wp_importers<br/>
+ * @global string $hook_suffix<br/>
+ * @global string $plugin_page<br/>
+ * @global string $typenow<br/>
+ * @global string $taxnow<br/>
+ */<br/>
+global $pagenow, $wp_importers, $hook_suffix, $plugin_page, $typenow, $taxnow;<br/>
+<br/>
+$page_hook = null;<br/>
+<br/>
+$editing = false;<br/>
+<br/>
+if ( isset( $_GET[&#39;page&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$plugin_page = wp_unslash( $_GET[&#39;page&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;$plugin_page = plugin_basename( $plugin_page );<br/>
+}<br/>
+<br/>
+if ( isset( $_REQUEST[&#39;post_type&#39;] ) &amp;&amp; post_type_exists( $_REQUEST[&#39;post_type&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$typenow = $_REQUEST[&#39;post_type&#39;];<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$typenow = &#39;&#39;;<br/>
+}<br/>
+<br/>
+if ( isset( $_REQUEST[&#39;taxonomy&#39;] ) &amp;&amp; taxonomy_exists( $_REQUEST[&#39;taxonomy&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$taxnow = $_REQUEST[&#39;taxonomy&#39;];<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$taxnow = &#39;&#39;;<br/>
+}<br/>
+<br/>
+if ( WP_NETWORK_ADMIN ) {<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . &#39;wp&ndash;admin/network/menu.php&#39; );<br/>
+} elseif ( WP_USER_ADMIN ) {<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . &#39;wp&ndash;admin/user/menu.php&#39; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . &#39;wp&ndash;admin/menu.php&#39; );<br/>
+}<br/>
+<br/>
+if ( current_user_can( &#39;manage_options&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_raise_memory_limit( &#39;admin&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Fires as an admin screen or script is being initialized.<br/>
+ *<br/>
+ * Note, this does not just run on user&ndash;facing admin screens.<br/>
+ * It runs on admin&ndash;ajax.php and admin&ndash;post.php as well.<br/>
+ *<br/>
+ * This is roughly analogous to the more general {@see &#39;init&#39;} hook, which fires earlier.<br/>
+ *<br/>
+ * @since 2.5.0<br/>
+ */<br/>
+do_action( &#39;admin_init&#39; );<br/>
+<br/>
+if ( isset( $plugin_page ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $typenow ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$the_parent = $pagenow . &#39;?post_type=&#39; . $typenow;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$the_parent = $pagenow;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$page_hook = get_plugin_page_hook( $plugin_page, $the_parent );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $page_hook ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$page_hook = get_plugin_page_hook( $plugin_page, $plugin_page );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Back&ndash;compat for plugins using add_management_page().<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $page_hook ) &amp;&amp; &#39;edit.php&#39; == $pagenow &amp;&amp; &#39;&#39; != get_plugin_page_hook( $plugin_page, &#39;tools.php&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// There could be plugin specific params on the URL, so we need the whole query string<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $_SERVER[&#39;QUERY_STRING&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$query_string = $_SERVER[&#39;QUERY_STRING&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$query_string = &#39;page=&#39; . $plugin_page;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;tools.php?&#39; . $query_string ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;unset( $the_parent );<br/>
+}<br/>
+<br/>
+$hook_suffix = &#39;&#39;;<br/>
+if ( isset( $page_hook ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$hook_suffix = $page_hook;<br/>
+} elseif ( isset( $plugin_page ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$hook_suffix = $plugin_page;<br/>
+} elseif ( isset( $pagenow ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$hook_suffix = $pagenow;<br/>
+}<br/>
+<br/>
+set_current_screen();<br/>
+<br/>
+// Handle plugin admin pages.<br/>
+if ( isset( $plugin_page ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( $page_hook ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires before a particular screen is loaded.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The load&ndash;* hook fires in a number of contexts. This hook is for plugin screens<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * where a callback is provided when the screen is registered.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$page_hook`, refers to a mixture of plugin<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * page information including:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * 1. The page type. If the plugin page is registered as a submenu page, such as for<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *    Settings, the page type would be &#39;settings&#39;. Otherwise the type is &#39;toplevel&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * 2. A separator of &#39;_page_&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * 3. The plugin basename minus the file extension.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Together, the three parts form the `$page_hook`. Citing the example above,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * the hook name used would be &#39;load&ndash;settings_page_pluginbasename&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @see get_plugin_page_hook()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &quot;load&ndash;{$page_hook}&quot; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;noheader&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Used to call the registered callback for a plugin screen.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * This hook uses a dynamic hook name, `$page_hook`, which refers to a mixture of plugin<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * page information including:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * 1. The page type. If the plugin page is registered as a submenu page, such as for<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *    Settings, the page type would be &#39;settings&#39;. Otherwise the type is &#39;toplevel&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * 2. A separator of &#39;_page_&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * 3. The plugin basename minus the file extension.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Together, the three parts form the `$page_hook`. Citing the example above,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * the hook name used would be &#39;settings_page_pluginbasename&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @see get_plugin_page_hook()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 1.5.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( $page_hook );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( validate_file( $plugin_page ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Invalid plugin page.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! ( file_exists( WP_PLUGIN_DIR . &quot;/$plugin_page&quot; ) &amp;&amp; is_file( WP_PLUGIN_DIR . &quot;/$plugin_page&quot; ) ) &amp;&amp; ! ( file_exists( WPMU_PLUGIN_DIR . &quot;/$plugin_page&quot; ) &amp;&amp; is_file( WPMU_PLUGIN_DIR . &quot;/$plugin_page&quot; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( sprintf( __( &#39;Cannot load %s.&#39; ), htmlentities( $plugin_page ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires before a particular screen is loaded.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The load&ndash;* hook fires in a number of contexts. This hook is for plugin screens<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * where the file to load is directly included, rather than the use of a function.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$plugin_page`, refers to the plugin basename.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @see plugin_basename()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 1.5.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &quot;load&ndash;{$plugin_page}&quot; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;noheader&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( file_exists( WPMU_PLUGIN_DIR . &quot;/$plugin_page&quot; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include( WPMU_PLUGIN_DIR . &quot;/$plugin_page&quot; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include( WP_PLUGIN_DIR . &quot;/$plugin_page&quot; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;exit();<br/>
+} elseif ( isset( $_GET[&#39;import&#39;] ) ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$importer = $_GET[&#39;import&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;import&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to import content.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( validate_file( $importer ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;import.php?invalid=&#39; . $importer ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! isset( $wp_importers[ $importer ] ) || ! is_callable( $wp_importers[ $importer ][2] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;import.php?invalid=&#39; . $importer ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires before an importer screen is loaded.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$importer`, refers to the importer slug.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.5.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;load&ndash;importer&ndash;{$importer}&quot; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$parent_file  = &#39;tools.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$submenu_file = &#39;import.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$title        = __( &#39;Import&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;noheader&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;admin/includes/upgrade.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_IMPORTING&#39;, true );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Whether to filter imported data through kses on import.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Multisite uses this hook to filter all data through kses by default,<br/>
+&nbsp;&nbsp;&nbsp; * as a super administrator may be assisting an untrusted user.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param bool $force Whether to force data to be filtered through kses. Default false.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;if ( apply_filters( &#39;force_filtered_html_on_import&#39;, false ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kses_init_filters();  // Always filter imported data with kses on multisite.<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;call_user_func( $wp_importers[ $importer ][2] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Make sure rules are flushed<br/>
+&nbsp;&nbsp;&nbsp;flush_rewrite_rules( false );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;exit();<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires before a particular screen is loaded.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The load&ndash;* hook fires in a number of contexts. This hook is for core screens.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$pagenow`, is a global variable<br/>
+&nbsp;&nbsp;&nbsp; * referring to the filename of the current page, such as &#39;admin.php&#39;,<br/>
+&nbsp;&nbsp;&nbsp; * &#39;post&ndash;new.php&#39; etc. A complete hook for the latter would be<br/>
+&nbsp;&nbsp;&nbsp; * &#39;load&ndash;post&ndash;new.php&#39;.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;load&ndash;{$pagenow}&quot; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp; * The following hooks are fired to ensure backward compatibility.<br/>
+&nbsp;&nbsp;&nbsp; * In all other cases, &#39;load&ndash;&#39; . $pagenow should be used instead.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;if ( $typenow == &#39;page&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $pagenow == &#39;post&ndash;new.php&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;load&ndash;page&ndash;new.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $pagenow == &#39;post.php&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;load&ndash;page.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( $pagenow == &#39;edit&ndash;tags.php&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $taxnow == &#39;category&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;load&ndash;categories.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $taxnow == &#39;link_category&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;load&ndash;edit&ndash;link&ndash;categories.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( &#39;term.php&#39; === $pagenow ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;load&ndash;edit&ndash;tags.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( ! empty( $_REQUEST[&#39;action&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$action = $_REQUEST[&#39;action&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires when an &#39;action&#39; request variable is sent.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$action`, refers to<br/>
+&nbsp;&nbsp;&nbsp; * the action derived from the `GET` or `POST` request.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;admin_action_{$action}&quot; );<br/>
+}</body></html>

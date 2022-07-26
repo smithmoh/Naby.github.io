@@ -1,0 +1,23 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Front to the WordPress application. This file doesn&#39;t do anything, but loads<br/>
+ * wp&ndash;blog&ndash;header.php which does and tells WordPress to load the theme.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * Tells WordPress to load the WordPress theme and output it.<br/>
+ *<br/>
+ * @var bool<br/>
+ */<br/>
+define( &#39;WP_USE_THEMES&#39;, true );<br/>
+<br/>
+/** Loads the WordPress Environment and Template */<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;blog&ndash;header.php&#39; );</body></html>

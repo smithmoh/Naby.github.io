@@ -1,0 +1,1177 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress User Page<br/>
+ *<br/>
+ * Handles authentication, registering, resetting passwords, forgot password,<br/>
+ * and other user handling.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+/** Make sure that the WordPress bootstrap has run before continuing. */<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+// Redirect to HTTPS login if forced to use SSL.<br/>
+if ( force_ssl_admin() &amp;&amp; ! is_ssl() ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( 0 === strpos( $_SERVER[&#39;REQUEST_URI&#39;], &#39;http&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( set_url_scheme( $_SERVER[&#39;REQUEST_URI&#39;], &#39;https&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( &#39;https://&#39; . $_SERVER[&#39;HTTP_HOST&#39;] . $_SERVER[&#39;REQUEST_URI&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Output the login page header.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ *<br/>
+ * @param string   $title    Optional. WordPress login Page title to display in the `&lt;title&gt;` element.<br/>
+ *                           Default &#39;Log In&#39;.<br/>
+ * @param string   $message  Optional. Message to display in header. Default empty.<br/>
+ * @param WP_Error $wp_error Optional. The error to pass. Default is a WP_Error instance.<br/>
+ */<br/>
+function login_header( $title = &#39;Log In&#39;, $message = &#39;&#39;, $wp_error = null ) {<br/>
+&nbsp;&nbsp;&nbsp;global $error, $interim_login, $action;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Don&#39;t index any of these forms<br/>
+&nbsp;&nbsp;&nbsp;add_action( &#39;login_head&#39;, &#39;wp_sensitive_page_meta&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;add_action( &#39;login_head&#39;, &#39;wp_login_viewport_meta&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $wp_error ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wp_error = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Shake it!<br/>
+&nbsp;&nbsp;&nbsp;$shake_error_codes = array( &#39;empty_password&#39;, &#39;empty_email&#39;, &#39;invalid_email&#39;, &#39;invalidcombo&#39;, &#39;empty_username&#39;, &#39;invalid_username&#39;, &#39;incorrect_password&#39; );<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the error codes array for shaking the login form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $shake_error_codes Error codes that shake the login form.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$shake_error_codes = apply_filters( &#39;shake_error_codes&#39;, $shake_error_codes );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $shake_error_codes &amp;&amp; $wp_error&ndash;&gt;has_errors() &amp;&amp; in_array( $wp_error&ndash;&gt;get_error_code(), $shake_error_codes ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add_action( &#39;login_head&#39;, &#39;wp_shake_js&#39;, 12 );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$login_title = get_bloginfo( &#39;name&#39;, &#39;display&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/* translators: Login screen title. 1: Login screen name, 2: Network or site name */<br/>
+&nbsp;&nbsp;&nbsp;$login_title = sprintf( __( &#39;%1$s &amp;lsaquo; %2$s &amp;#8212; WordPress&#39; ), $title, $login_title );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( wp_is_recovery_mode() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: Login screen title. */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$login_title = sprintf( __( &#39;Recovery Mode &amp;#8212; %s&#39; ), $login_title );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the title tag content for login page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.9.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $login_title The page title, with extra context added.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $title       The original page title.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$login_title = apply_filters( &#39;login_title&#39;, $login_title, $title );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;?&gt;&lt;!DOCTYPE html&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;!&ndash;&ndash;[if IE 8]&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; class=&quot;ie8&quot; &lt;?php language_attributes(); ?&gt;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;![endif]&ndash;&ndash;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;!&ndash;&ndash;[if !(IE 8) ]&gt;&lt;!&ndash;&ndash;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; &lt;?php language_attributes(); ?&gt;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;!&ndash;&ndash;&lt;![endif]&ndash;&ndash;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;head&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta http&ndash;equiv=&quot;Content&ndash;Type&quot; content=&quot;&lt;?php bloginfo( &#39;html_type&#39; ); ?&gt;; charset=&lt;?php bloginfo( &#39;charset&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;title&gt;&lt;?php echo $login_title; ?&gt;&lt;/title&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_enqueue_style( &#39;login&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp; * Remove all stored post data on logging out.<br/>
+&nbsp;&nbsp;&nbsp; * This could be added by add_action(&#39;login_head&#39;...) like wp_shake_js(),<br/>
+&nbsp;&nbsp;&nbsp; * but maybe better if it&#39;s not removable by plugins.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;loggedout&#39; == $wp_error&ndash;&gt;get_error_code() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;script&gt;if(&quot;sessionStorage&quot; in window){try{for(var key in sessionStorage){if(key.indexOf(&quot;wp&ndash;autosave&ndash;&quot;)!=&ndash;1){sessionStorage.removeItem(key)}}}catch(e){}};&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Enqueue scripts and styles for the login page.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;login_enqueue_scripts&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires in the login page header after scripts are enqueued.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;login_head&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$login_header_url = __( &#39;https://wordpress.org/&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters link URL of the header logo above login form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $login_header_url Login header logo URL.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$login_header_url = apply_filters( &#39;login_headerurl&#39;, $login_header_url );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$login_header_title = &#39;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the title attribute of the header logo above login form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; * @deprecated 5.2.0 Use login_headertext<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $login_header_title Login header logo title attribute.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$login_header_title = apply_filters_deprecated(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;login_headertitle&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array( $login_header_title ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;5.2.0&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;login_headertext&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Usage of the title attribute on the login logo is not recommended for accessibility reasons. Use the link text instead.&#39; )<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$login_header_text = empty( $login_header_title ) ? __( &#39;Powered by WordPress&#39; ) : $login_header_title;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the link text of the header logo above the login form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 5.2.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $login_header_text The login header logo link text.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$login_header_text = apply_filters( &#39;login_headertext&#39;, $login_header_text );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$classes = array( &#39;login&ndash;action&ndash;&#39; . $action, &#39;wp&ndash;core&ndash;ui&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( is_rtl() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$classes[] = &#39;rtl&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $interim_login ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$classes[] = &#39;interim&ndash;login&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;style type=&quot;text/css&quot;&gt;html{background&ndash;color: transparent;}&lt;/style&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;success&#39; === $interim_login ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$classes[] = &#39;interim&ndash;login&ndash;success&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;$classes[] = &#39; locale&ndash;&#39; . sanitize_html_class( strtolower( str_replace( &#39;_&#39;, &#39;&ndash;&#39;, get_locale() ) ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the login page body classes.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array  $classes An array of body classes.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $action  The action that brought the visitor to the login page.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$classes = apply_filters( &#39;login_body_class&#39;, $classes, $action );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/head&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;body class=&quot;login &lt;?php echo esc_attr( implode( &#39; &#39;, $classes ) ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires in the login page header after the body tag is opened.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.6.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;login_header&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;login&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h1&gt;&lt;a href=&quot;&lt;?php echo esc_url( $login_header_url ); ?&gt;&quot;&gt;&lt;?php echo $login_header_text; ?&gt;&lt;/a&gt;&lt;/h1&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the message to display above the login form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $message Login message text.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$message = apply_filters( &#39;login_message&#39;, $message );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $message ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo $message . &quot;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// In case a plugin uses $error rather than the $wp_errors object.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $error ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wp_error&ndash;&gt;add( &#39;error&#39;, $error );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unset( $error );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $wp_error&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors   = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wp_error&ndash;&gt;get_error_codes() as $code ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$severity = $wp_error&ndash;&gt;get_error_data( $code );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wp_error&ndash;&gt;get_error_messages( $code ) as $error_message ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;message&#39; == $severity ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages .= &#39;	&#39; . $error_message . &quot;&lt;br /&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors .= &#39;	&#39; . $error_message . &quot;&lt;br /&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the error messages displayed above the login form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $errors Login error message.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div id=&quot;login_error&quot;&gt;&#39; . apply_filters( &#39;login_errors&#39;, $errors ) . &quot;&lt;/div&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $messages ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters instructional messages displayed above the login form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $messages Login messages.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;message&quot;&gt;&#39; . apply_filters( &#39;login_messages&#39;, $messages ) . &quot;&lt;/p&gt;\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+} // End of login_header()<br/>
+<br/>
+/**<br/>
+ * Outputs the footer for the login page.<br/>
+ *<br/>
+ * @since 3.1.0<br/>
+ *<br/>
+ * @param string $input_id Which input to auto&ndash;focus.<br/>
+ */<br/>
+function login_footer( $input_id = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;global $interim_login;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Don&#39;t allow interim logins to navigate away from the page.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $interim_login ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;backtoblog&quot;&gt;&lt;a href=&quot;&lt;?php echo esc_url( home_url( &#39;/&#39; ) ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site title */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( _x( &#39;&amp;larr; Back to %s&#39;, &#39;site&#39; ), get_bloginfo( &#39;title&#39;, &#39;display&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/a&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php the_privacy_policy_link( &#39;&lt;div class=&quot;privacy&ndash;policy&ndash;page&ndash;link&quot;&gt;&#39;, &#39;&lt;/div&gt;&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php if ( ! empty( $input_id ) ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;try{document.getElementById(&#39;&lt;?php echo $input_id; ?&gt;&#39;).focus();}catch(e){}<br/>
+&nbsp;&nbsp;&nbsp;if(typeof wpOnload==&#39;function&#39;)wpOnload();<br/>
+&nbsp;&nbsp;&nbsp;&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires in the login page footer.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;login_footer&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/body&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/html&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Outputs the Javascript to handle the form shaking.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+function wp_shake_js() {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+addLoadEvent = function(func){if(typeof jQuery!=&quot;undefined&quot;)jQuery(document).ready(func);else if(typeof wpOnload!=&#39;function&#39;){wpOnload=func;}else{var oldonload=wpOnload;wpOnload=function(){oldonload();func();}}};<br/>
+function s(id,pos){g(id).left=pos+&#39;px&#39;;}<br/>
+function g(id){return document.getElementById(id).style;}<br/>
+function shake(id,a,d){c=a.shift();s(id,c);if(a.length&gt;0){setTimeout(function(){shake(id,a,d);},d);}else{try{g(id).position=&#39;static&#39;;wp_attempt_focus();}catch(e){}}}<br/>
+addLoadEvent(function(){ var p=new Array(15,30,15,0,&ndash;15,&ndash;30,&ndash;15,0);p=p.concat(p.concat(p));var i=document.forms[0].id;g(i).position=&#39;relative&#39;;shake(i,p,20);});<br/>
+&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Outputs the viewport meta tag.<br/>
+ *<br/>
+ * @since 3.7.0<br/>
+ */<br/>
+function wp_login_viewport_meta() {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta name=&quot;viewport&quot; content=&quot;width=device&ndash;width&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Handles sending password retrieval email to user.<br/>
+ *<br/>
+ * @since 2.5.0<br/>
+ *<br/>
+ * @return bool|WP_Error True: when finish. WP_Error on error<br/>
+ */<br/>
+function retrieve_password() {<br/>
+&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $_POST[&#39;user_login&#39;] ) || ! is_string( $_POST[&#39;user_login&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;empty_username&#39;, __( &#39;&lt;strong&gt;ERROR&lt;/strong&gt;: Enter a username or email address.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( strpos( $_POST[&#39;user_login&#39;], &#39;@&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_data = get_user_by( &#39;email&#39;, trim( wp_unslash( $_POST[&#39;user_login&#39;] ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $user_data ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;invalid_email&#39;, __( &#39;&lt;strong&gt;ERROR&lt;/strong&gt;: There is no account with that username or email address.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$login     = trim( $_POST[&#39;user_login&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_data = get_user_by( &#39;login&#39;, $login );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires before errors are returned from a password reset request.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.4.0 Added the `$errors` parameter.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param WP_Error $errors A WP_Error object containing any errors generated<br/>
+&nbsp;&nbsp;&nbsp; *                         by using invalid credentials.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;lostpassword_post&#39;, $errors );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $errors;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! $user_data ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;invalidcombo&#39;, __( &#39;&lt;strong&gt;ERROR&lt;/strong&gt;: There is no account with that username or email address.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $errors;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Redefining user_login ensures we return the right case in the email.<br/>
+&nbsp;&nbsp;&nbsp;$user_login = $user_data&ndash;&gt;user_login;<br/>
+&nbsp;&nbsp;&nbsp;$user_email = $user_data&ndash;&gt;user_email;<br/>
+&nbsp;&nbsp;&nbsp;$key        = get_password_reset_key( $user_data );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( is_wp_error( $key ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return $key;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$site_name = get_network()&ndash;&gt;site_name;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The blogname option is escaped with esc_html on the way into the database<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * in sanitize_option we want to reverse this for the plain text arena of emails.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$site_name = wp_specialchars_decode( get_option( &#39;blogname&#39; ), ENT_QUOTES );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$message = __( &#39;Someone has requested a password reset for the following account:&#39; ) . &quot;\r\n\r\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: site name */<br/>
+&nbsp;&nbsp;&nbsp;$message .= sprintf( __( &#39;Site Name: %s&#39; ), $site_name ) . &quot;\r\n\r\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: user login */<br/>
+&nbsp;&nbsp;&nbsp;$message .= sprintf( __( &#39;Username: %s&#39; ), $user_login ) . &quot;\r\n\r\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$message .= __( &#39;If this was a mistake, just ignore this email and nothing will happen.&#39; ) . &quot;\r\n\r\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$message .= __( &#39;To reset your password, visit the following address:&#39; ) . &quot;\r\n\r\n&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$message .= &#39;&lt;&#39; . network_site_url( &quot;wp&ndash;login.php?action=rp&amp;key=$key&amp;login=&quot; . rawurlencode( $user_login ), &#39;login&#39; ) . &quot;&gt;\r\n&quot;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/* translators: Password reset notification email subject. %s: Site title */<br/>
+&nbsp;&nbsp;&nbsp;$title = sprintf( __( &#39;[%s] Password Reset&#39; ), $site_name );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the subject of the password reset email.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.8.0<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.4.0 Added the `$user_login` and `$user_data` parameters.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string  $title      Default email title.<br/>
+&nbsp;&nbsp;&nbsp; * @param string  $user_login The username for the user.<br/>
+&nbsp;&nbsp;&nbsp; * @param WP_User $user_data  WP_User object.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$title = apply_filters( &#39;retrieve_password_title&#39;, $title, $user_login, $user_data );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the message body of the password reset mail.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * If the filtered message is empty, the password reset email will not be sent.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.8.0<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.1.0 Added `$user_login` and `$user_data` parameters.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string  $message    Default mail message.<br/>
+&nbsp;&nbsp;&nbsp; * @param string  $key        The activation key.<br/>
+&nbsp;&nbsp;&nbsp; * @param string  $user_login The username for the user.<br/>
+&nbsp;&nbsp;&nbsp; * @param WP_User $user_data  WP_User object.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$message = apply_filters( &#39;retrieve_password_message&#39;, $message, $key, $user_login, $user_data );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $message &amp;&amp; ! wp_mail( $user_email, wp_specialchars_decode( $title ), $message ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;The email could not be sent. Possible reason: your host may have disabled the mail() function.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;return true;<br/>
+}<br/>
+<br/>
+//<br/>
+// Main.<br/>
+//<br/>
+<br/>
+$action = isset( $_REQUEST[&#39;action&#39;] ) ? $_REQUEST[&#39;action&#39;] : &#39;login&#39;;<br/>
+$errors = new WP_Error();<br/>
+<br/>
+if ( isset( $_GET[&#39;key&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$action = &#39;resetpass&#39;;<br/>
+}<br/>
+<br/>
+// Validate action so as to default to the login screen.<br/>
+if ( ! in_array( $action, array( &#39;postpass&#39;, &#39;logout&#39;, &#39;lostpassword&#39;, &#39;retrievepassword&#39;, &#39;resetpass&#39;, &#39;rp&#39;, &#39;register&#39;, &#39;login&#39;, &#39;confirmaction&#39;, WP_Recovery_Mode_Link_Service::LOGIN_ACTION_ENTERED ), true ) &amp;&amp; false === has_filter( &#39;login_form_&#39; . $action ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$action = &#39;login&#39;;<br/>
+}<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+header( &#39;Content&ndash;Type: &#39; . get_bloginfo( &#39;html_type&#39; ) . &#39;; charset=&#39; . get_bloginfo( &#39;charset&#39; ) );<br/>
+<br/>
+if ( defined( &#39;RELOCATE&#39; ) &amp;&amp; RELOCATE ) { // Move flag is set<br/>
+&nbsp;&nbsp;&nbsp;if ( isset( $_SERVER[&#39;PATH_INFO&#39;] ) &amp;&amp; ( $_SERVER[&#39;PATH_INFO&#39;] != $_SERVER[&#39;PHP_SELF&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$_SERVER[&#39;PHP_SELF&#39;] = str_replace( $_SERVER[&#39;PATH_INFO&#39;], &#39;&#39;, $_SERVER[&#39;PHP_SELF&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$url = dirname( set_url_scheme( &#39;http://&#39; . $_SERVER[&#39;HTTP_HOST&#39;] . $_SERVER[&#39;PHP_SELF&#39;] ) );<br/>
+&nbsp;&nbsp;&nbsp;if ( $url != get_option( &#39;siteurl&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update_option( &#39;siteurl&#39;, $url );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+//Set a cookie now to see if they are supported by the browser.<br/>
+$secure = ( &#39;https&#39; === parse_url( wp_login_url(), PHP_URL_SCHEME ) );<br/>
+setcookie( TEST_COOKIE, &#39;WP Cookie check&#39;, 0, COOKIEPATH, COOKIE_DOMAIN, $secure );<br/>
+if ( SITECOOKIEPATH != COOKIEPATH ) {<br/>
+&nbsp;&nbsp;&nbsp;setcookie( TEST_COOKIE, &#39;WP Cookie check&#39;, 0, SITECOOKIEPATH, COOKIE_DOMAIN, $secure );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Fires when the login form is initialized.<br/>
+ *<br/>
+ * @since 3.2.0<br/>
+ */<br/>
+do_action( &#39;login_init&#39; );<br/>
+<br/>
+/**<br/>
+ * Fires before a specified login form action.<br/>
+ *<br/>
+ * The dynamic portion of the hook name, `$action`, refers to the action<br/>
+ * that brought the visitor to the login form. Actions include &#39;postpass&#39;,<br/>
+ * &#39;logout&#39;, &#39;lostpassword&#39;, etc.<br/>
+ *<br/>
+ * @since 2.8.0<br/>
+ */<br/>
+do_action( &quot;login_form_{$action}&quot; );<br/>
+<br/>
+$http_post     = ( &#39;POST&#39; == $_SERVER[&#39;REQUEST_METHOD&#39;] );<br/>
+$interim_login = isset( $_REQUEST[&#39;interim&ndash;login&#39;] );<br/>
+<br/>
+/**<br/>
+ * Filters the separator used between login form navigation links.<br/>
+ *<br/>
+ * @since 4.9.0<br/>
+ *<br/>
+ * @param string $login_link_separator The separator used between login form navigation links.<br/>
+ */<br/>
+$login_link_separator = apply_filters( &#39;login_link_separator&#39;, &#39; | &#39; );<br/>
+<br/>
+switch ( $action ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;postpass&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! array_key_exists( &#39;post_password&#39;, $_POST ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( wp_get_referer() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once ABSPATH . WPINC . &#39;/class&ndash;phpass.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$hasher = new PasswordHash( 8, true );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the life span of the post password cookie.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * By default, the cookie expires 10 days from creation. To turn this<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * into a session cookie, return 0.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.7.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param int $expires The expiry time, as passed to setcookie().<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$expire  = apply_filters( &#39;post_password_expires&#39;, time() + 10 * DAY_IN_SECONDS );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$referer = wp_get_referer();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $referer ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$secure = ( &#39;https&#39; === parse_url( $referer, PHP_URL_SCHEME ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$secure = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setcookie( &#39;wp&ndash;postpass_&#39; . COOKIEHASH, $hasher&ndash;&gt;HashPassword( wp_unslash( $_POST[&#39;post_password&#39;] ) ), $expire, COOKIEPATH, COOKIE_DOMAIN, $secure );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( wp_get_referer() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;logout&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;log&ndash;out&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = wp_get_current_user();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_logout();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $_REQUEST[&#39;redirect_to&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = $requested_redirect_to = $_REQUEST[&#39;redirect_to&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to           = &#39;wp&ndash;login.php?loggedout=true&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$requested_redirect_to = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the log out redirect URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 4.2.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string  $redirect_to           The redirect destination URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string  $requested_redirect_to The requested redirect destination URL passed as a parameter.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param WP_User $user                  The WP_User object for the user that&#39;s logging out.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = apply_filters( &#39;logout_redirect&#39;, $redirect_to, $requested_redirect_to, $user );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;lostpassword&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;retrievepassword&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $http_post ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = retrieve_password();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = ! empty( $_REQUEST[&#39;redirect_to&#39;] ) ? $_REQUEST[&#39;redirect_to&#39;] : &#39;wp&ndash;login.php?checkemail=confirm&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_GET[&#39;error&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;invalidkey&#39; == $_GET[&#39;error&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;invalidkey&#39;, __( &#39;Your password reset link appears to be invalid. Please request a new link below.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( &#39;expiredkey&#39; == $_GET[&#39;error&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;expiredkey&#39;, __( &#39;Your password reset link has expired. Please request a new link below.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$lostpassword_redirect = ! empty( $_REQUEST[&#39;redirect_to&#39;] ) ? $_REQUEST[&#39;redirect_to&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the URL redirected to after submitting the lostpassword/retrievepassword form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $lostpassword_redirect The redirect destination URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = apply_filters( &#39;lostpassword_redirect&#39;, $lostpassword_redirect );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires before the lost password form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 1.5.1<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 5.1.0 Added the `$errors` parameter.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param WP_Error $errors A `WP_Error` object containing any errors generated by using invalid<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *                         credentials. Note that the error object may not contain any errors.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;lost_password&#39;, $errors );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( __( &#39;Lost Password&#39; ), &#39;&lt;p class=&quot;message&quot;&gt;&#39; . __( &#39;Please enter your username or email address. You will receive a link to create a new password via email.&#39; ) . &#39;&lt;/p&gt;&#39;, $errors );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_login = &#39;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;user_login&#39;] ) &amp;&amp; is_string( $_POST[&#39;user_login&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_login = wp_unslash( $_POST[&#39;user_login&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;form name=&quot;lostpasswordform&quot; id=&quot;lostpasswordform&quot; action=&quot;&lt;?php echo esc_url( network_site_url( &#39;wp&ndash;login.php?action=lostpassword&#39;, &#39;login_post&#39; ) ); ?&gt;&quot; method=&quot;post&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;user_login&quot; &gt;&lt;?php _e( &#39;Username or Email Address&#39; ); ?&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;user_login&quot; id=&quot;user_login&quot; class=&quot;input&quot; value=&quot;&lt;?php echo esc_attr( $user_login ); ?&gt;&quot; size=&quot;20&quot; autocapitalize=&quot;off&quot; /&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires inside the lostpassword form tags, before the hidden fields.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;lostpassword_form&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;redirect_to&quot; value=&quot;&lt;?php echo esc_attr( $redirect_to ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;&lt;input type=&quot;submit&quot; name=&quot;wp&ndash;submit&quot; id=&quot;wp&ndash;submit&quot; class=&quot;button button&ndash;primary button&ndash;large&quot; value=&quot;&lt;?php esc_attr_e( &#39;Get New Password&#39; ); ?&gt;&quot; /&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;nav&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo esc_url( wp_login_url() ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Log in&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( get_option( &#39;users_can_register&#39; ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$registration_url = sprintf( &#39;&lt;a href=&quot;%s&quot;&gt;%s&lt;/a&gt;&#39;, esc_url( wp_registration_url() ), __( &#39;Register&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo esc_html( $login_link_separator );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;includes/general&ndash;template.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;register&#39;, $registration_url );<br/>
+&nbsp;&nbsp;&nbsp;endif;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_footer( &#39;user_login&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;resetpass&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;rp&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;list( $rp_path ) = explode( &#39;?&#39;, wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$rp_cookie       = &#39;wp&ndash;resetpass&ndash;&#39; . COOKIEHASH;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_GET[&#39;key&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$value = sprintf( &#39;%s:%s&#39;, wp_unslash( $_GET[&#39;login&#39;] ), wp_unslash( $_GET[&#39;key&#39;] ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setcookie( $rp_cookie, $value, 0, $rp_path, COOKIE_DOMAIN, is_ssl(), true );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( remove_query_arg( array( &#39;key&#39;, &#39;login&#39; ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_COOKIE[ $rp_cookie ] ) &amp;&amp; 0 &lt; strpos( $_COOKIE[ $rp_cookie ], &#39;:&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;list( $rp_login, $rp_key ) = explode( &#39;:&#39;, wp_unslash( $_COOKIE[ $rp_cookie ] ), 2 );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user                      = check_password_reset_key( $rp_key, $rp_login );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;pass1&#39;] ) &amp;&amp; ! hash_equals( $rp_key, $_POST[&#39;rp_key&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $user || is_wp_error( $user ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setcookie( $rp_cookie, &#39; &#39;, time() &ndash; YEAR_IN_SECONDS, $rp_path, COOKIE_DOMAIN, is_ssl(), true );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $user &amp;&amp; $user&ndash;&gt;get_error_code() === &#39;expired_key&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( site_url( &#39;wp&ndash;login.php?action=lostpassword&amp;error=expiredkey&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( site_url( &#39;wp&ndash;login.php?action=lostpassword&amp;error=invalidkey&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;pass1&#39;] ) &amp;&amp; $_POST[&#39;pass1&#39;] != $_POST[&#39;pass2&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;password_reset_mismatch&#39;, __( &#39;The passwords do not match.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires before the password reset procedure is validated.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.5.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param object           $errors WP Error object.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param WP_User|WP_Error $user   WP_User object if the login and reset key match. WP_Error object otherwise.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;validate_password_reset&#39;, $errors, $user );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( ! $errors&ndash;&gt;has_errors() ) &amp;&amp; isset( $_POST[&#39;pass1&#39;] ) &amp;&amp; ! empty( $_POST[&#39;pass1&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reset_password( $user, $_POST[&#39;pass1&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setcookie( $rp_cookie, &#39; &#39;, time() &ndash; YEAR_IN_SECONDS, $rp_path, COOKIE_DOMAIN, is_ssl(), true );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( __( &#39;Password Reset&#39; ), &#39;&lt;p class=&quot;message reset&ndash;pass&quot;&gt;&#39; . __( &#39;Your password has been reset.&#39; ) . &#39; &lt;a href=&quot;&#39; . esc_url( wp_login_url() ) . &#39;&quot;&gt;&#39; . __( &#39;Log in&#39; ) . &#39;&lt;/a&gt;&lt;/p&gt;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_footer();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;utils&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;user&ndash;profile&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( __( &#39;Reset Password&#39; ), &#39;&lt;p class=&quot;message reset&ndash;pass&quot;&gt;&#39; . __( &#39;Enter your new password below.&#39; ) . &#39;&lt;/p&gt;&#39;, $errors );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form name=&quot;resetpassform&quot; id=&quot;resetpassform&quot; action=&quot;&lt;?php echo esc_url( network_site_url( &#39;wp&ndash;login.php?action=resetpass&#39;, &#39;login_post&#39; ) ); ?&gt;&quot; method=&quot;post&quot; autocomplete=&quot;off&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; id=&quot;user_login&quot; value=&quot;&lt;?php echo esc_attr( $rp_login ); ?&gt;&quot; autocomplete=&quot;off&quot; /&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;user&ndash;pass1&ndash;wrap&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;pass1&quot;&gt;&lt;?php _e( &#39;New password&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;wp&ndash;pwd&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;password&ndash;input&ndash;wrapper&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;password&quot; data&ndash;reveal=&quot;1&quot; data&ndash;pw=&quot;&lt;?php echo esc_attr( wp_generate_password( 16 ) ); ?&gt;&quot; name=&quot;pass1&quot; id=&quot;pass1&quot; class=&quot;input password&ndash;input&quot; size=&quot;24&quot; value=&quot;&quot; autocomplete=&quot;off&quot; aria&ndash;describedby=&quot;pass&ndash;strength&ndash;result&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;button button&ndash;secondary wp&ndash;hide&ndash;pw hide&ndash;if&ndash;no&ndash;js&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;dashicons dashicons&ndash;hidden&quot; aria&ndash;hidden=&quot;true&quot;&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;pass&ndash;strength&ndash;result&quot; class=&quot;hide&ndash;if&ndash;no&ndash;js&quot; aria&ndash;live=&quot;polite&quot;&gt;&lt;?php _e( &#39;Strength indicator&#39; ); ?&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;pw&ndash;weak&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;checkbox&quot; name=&quot;pw_weak&quot; class=&quot;pw&ndash;checkbox&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;Confirm use of weak password&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;user&ndash;pass2&ndash;wrap&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;pass2&quot;&gt;&lt;?php _e( &#39;Confirm new password&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;password&quot; name=&quot;pass2&quot; id=&quot;pass2&quot; class=&quot;input&quot; size=&quot;20&quot; value=&quot;&quot; autocomplete=&quot;off&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;description indicator&ndash;hint&quot;&gt;&lt;?php echo wp_get_password_hint(); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;br class=&quot;clear&quot; /&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires following the &#39;Strength indicator&#39; meter in the user password reset form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.9.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param WP_User $user User object of the user whose password is being reset.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;resetpass_form&#39;, $user );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;rp_key&quot; value=&quot;&lt;?php echo esc_attr( $rp_key ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;&lt;input type=&quot;submit&quot; name=&quot;wp&ndash;submit&quot; id=&quot;wp&ndash;submit&quot; class=&quot;button button&ndash;primary button&ndash;large&quot; value=&quot;&lt;?php esc_attr_e( &#39;Reset Password&#39; ); ?&gt;&quot; /&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;nav&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo esc_url( wp_login_url() ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Log in&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( get_option( &#39;users_can_register&#39; ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$registration_url = sprintf( &#39;&lt;a href=&quot;%s&quot;&gt;%s&lt;/a&gt;&#39;, esc_url( wp_registration_url() ), __( &#39;Register&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo esc_html( $login_link_separator );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;includes/general&ndash;template.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;register&#39;, $registration_url );<br/>
+&nbsp;&nbsp;&nbsp;endif;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_footer( &#39;user_pass&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;register&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the Multisite sign up URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $sign_up_url The sign up URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( apply_filters( &#39;wp_signup_location&#39;, network_site_url( &#39;wp&ndash;signup.php&#39; ) ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! get_option( &#39;users_can_register&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( site_url( &#39;wp&ndash;login.php?registration=disabled&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_login = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_email = &#39;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $http_post ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;user_login&#39;] ) &amp;&amp; is_string( $_POST[&#39;user_login&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_login = $_POST[&#39;user_login&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;user_email&#39;] ) &amp;&amp; is_string( $_POST[&#39;user_email&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_email = wp_unslash( $_POST[&#39;user_email&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = register_new_user( $user_login, $user_email );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = ! empty( $_POST[&#39;redirect_to&#39;] ) ? $_POST[&#39;redirect_to&#39;] : &#39;wp&ndash;login.php?checkemail=registered&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$registration_redirect = ! empty( $_REQUEST[&#39;redirect_to&#39;] ) ? $_REQUEST[&#39;redirect_to&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the registration redirect URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $registration_redirect The redirect destination URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = apply_filters( &#39;registration_redirect&#39;, $registration_redirect );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( __( &#39;Registration Form&#39; ), &#39;&lt;p class=&quot;message register&quot;&gt;&#39; . __( &#39;Register For This Site&#39; ) . &#39;&lt;/p&gt;&#39;, $errors );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form name=&quot;registerform&quot; id=&quot;registerform&quot; action=&quot;&lt;?php echo esc_url( site_url( &#39;wp&ndash;login.php?action=register&#39;, &#39;login_post&#39; ) ); ?&gt;&quot; method=&quot;post&quot; novalidate=&quot;novalidate&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;user_login&quot;&gt;&lt;?php _e( &#39;Username&#39; ); ?&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;user_login&quot; id=&quot;user_login&quot; class=&quot;input&quot; value=&quot;&lt;?php echo esc_attr( wp_unslash( $user_login ) ); ?&gt;&quot; size=&quot;20&quot; autocapitalize=&quot;off&quot; /&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;user_email&quot;&gt;&lt;?php _e( &#39;Email&#39; ); ?&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;email&quot; name=&quot;user_email&quot; id=&quot;user_email&quot; class=&quot;input&quot; value=&quot;&lt;?php echo esc_attr( wp_unslash( $user_email ) ); ?&gt;&quot; size=&quot;25&quot; /&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires following the &#39;Email&#39; field in the user registration form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;register_form&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;reg_passmail&quot;&gt;&lt;?php _e( &#39;Registration confirmation will be emailed to you.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;br class=&quot;clear&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;redirect_to&quot; value=&quot;&lt;?php echo esc_attr( $redirect_to ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;&lt;input type=&quot;submit&quot; name=&quot;wp&ndash;submit&quot; id=&quot;wp&ndash;submit&quot; class=&quot;button button&ndash;primary button&ndash;large&quot; value=&quot;&lt;?php esc_attr_e( &#39;Register&#39; ); ?&gt;&quot; /&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;nav&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo esc_url( wp_login_url() ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Log in&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php echo esc_html( $login_link_separator ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo esc_url( wp_lostpassword_url() ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Lost your password?&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_footer( &#39;user_login&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;confirmaction&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;request_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Missing request ID.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;confirm_key&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Missing confirm key.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$request_id = (int) $_GET[&#39;request_id&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$key        = sanitize_text_field( wp_unslash( $_GET[&#39;confirm_key&#39;] ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$result     = wp_validate_user_request_key( $request_id, $key );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_wp_error( $result ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( $result );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires an action hook when the account action has been confirmed by the user.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Using this you can assume the user has agreed to perform the action by<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * clicking on the link in the confirmation email.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * After firing this action hook the page will redirect to wp&ndash;login a callback<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * redirects or exits first.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 4.9.6<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param int $request_id Request ID.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;user_request_action_confirmed&#39;, $request_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message = _wp_privacy_account_request_confirmed_message( $request_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( __( &#39;User action confirmed.&#39; ), $message );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_footer();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;login&#39;:<br/>
+&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$secure_cookie   = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$customize_login = isset( $_REQUEST[&#39;customize&ndash;login&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $customize_login ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;customize&ndash;base&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If the user wants SSL but the session is not SSL, force a secure cookie.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $_POST[&#39;log&#39;] ) &amp;&amp; ! force_ssl_admin() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_name = sanitize_user( $_POST[&#39;log&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user      = get_user_by( &#39;login&#39;, $user_name );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $user &amp;&amp; strpos( $user_name, &#39;@&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = get_user_by( &#39;email&#39;, $user_name );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $user ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( get_user_option( &#39;use_ssl&#39;, $user&ndash;&gt;ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$secure_cookie = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;force_ssl_admin( true );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_REQUEST[&#39;redirect_to&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = $_REQUEST[&#39;redirect_to&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Redirect to HTTPS if user wants SSL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $secure_cookie &amp;&amp; false !== strpos( $redirect_to, &#39;wp&ndash;admin&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = preg_replace( &#39;|^http://|&#39;, &#39;https://&#39;, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = admin_url();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$reauth = empty( $_REQUEST[&#39;reauth&#39;] ) ? false : true;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = wp_signon( array(), $secure_cookie );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( headers_sent() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = new WP_Error(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;test_cookie&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: Browser cookie documentation URL, 2: Support forums URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;&lt;strong&gt;ERROR&lt;/strong&gt;: Cookies are blocked due to unexpected output. For help, please see &lt;a href=&quot;%1$s&quot;&gt;this documentation&lt;/a&gt; or try the &lt;a href=&quot;%2$s&quot;&gt;support forums&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;https://wordpress.org/support/article/cookies/&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;https://wordpress.org/support/&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_POST[&#39;testcookie&#39;] ) &amp;&amp; empty( $_COOKIE[ TEST_COOKIE ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If cookies are disabled we can&#39;t log in even with a valid user+pass<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = new WP_Error(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;test_cookie&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: Browser cookie documentation URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;&lt;strong&gt;ERROR&lt;/strong&gt;: Cookies are blocked or not supported by your browser. You must &lt;a href=&quot;%s&quot;&gt;enable cookies&lt;/a&gt; to use WordPress.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;https://wordpress.org/support/article/cookies/#enable&ndash;cookies&ndash;in&ndash;your&ndash;browser&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$requested_redirect_to = isset( $_REQUEST[&#39;redirect_to&#39;] ) ? $_REQUEST[&#39;redirect_to&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the login redirect URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string           $redirect_to           The redirect destination URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string           $requested_redirect_to The requested redirect destination URL passed as a parameter.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param WP_User|WP_Error $user                  WP_User object if login was successful, WP_Error object otherwise.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = apply_filters( &#39;login_redirect&#39;, $redirect_to, $requested_redirect_to, $user );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $user ) &amp;&amp; ! $reauth ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $interim_login ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message       = &#39;&lt;p class=&quot;message&quot;&gt;&#39; . __( &#39;You have logged in successfully.&#39; ) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$interim_login = &#39;success&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( &#39;&#39;, $message );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;login.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;login_footer&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( $customize_login ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;script type=&quot;text/javascript&quot;&gt;setTimeout( function(){ new wp.customize.Messenger({ url: &#39;&lt;?php echo wp_customize_url(); ?&gt;&#39;, channel: &#39;login&#39; }).send(&#39;login&#39;) }, 1000 );&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/body&gt;&lt;/html&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( empty( $redirect_to ) || $redirect_to == &#39;wp&ndash;admin/&#39; || $redirect_to == admin_url() ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If the user doesn&#39;t belong to a blog, send them to user admin. If the user can&#39;t edit posts, send them to their profile.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_multisite() &amp;&amp; ! get_active_blog_for_user( $user&ndash;&gt;ID ) &amp;&amp; ! is_super_admin( $user&ndash;&gt;ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = user_admin_url();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( is_multisite() &amp;&amp; ! $user&ndash;&gt;has_cap( &#39;read&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = get_dashboard_url( $user&ndash;&gt;ID );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! $user&ndash;&gt;has_cap( &#39;edit_posts&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = $user&ndash;&gt;has_cap( &#39;read&#39; ) ? admin_url( &#39;profile.php&#39; ) : home_url();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = $user;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Clear errors if loggedout is set.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $_GET[&#39;loggedout&#39;] ) || $reauth ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $_POST ) &amp;&amp; $errors&ndash;&gt;get_error_codes() === array( &#39;empty_username&#39;, &#39;empty_password&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error( &#39;&#39;, &#39;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $interim_login ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;expired&#39;, __( &#39;Your session has expired. Please log in to continue where you left off.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Some parts of this script use the main login form to display a message.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_GET[&#39;loggedout&#39;] ) &amp;&amp; true == $_GET[&#39;loggedout&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;loggedout&#39;, __( &#39;You are now logged out.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_GET[&#39;registration&#39;] ) &amp;&amp; &#39;disabled&#39; == $_GET[&#39;registration&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;registerdisabled&#39;, __( &#39;User registration is currently not allowed.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_GET[&#39;checkemail&#39;] ) &amp;&amp; &#39;confirm&#39; == $_GET[&#39;checkemail&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;confirm&#39;, __( &#39;Check your email for the confirmation link.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_GET[&#39;checkemail&#39;] ) &amp;&amp; &#39;newpass&#39; == $_GET[&#39;checkemail&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;newpass&#39;, __( &#39;Check your email for your new password.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( isset( $_GET[&#39;checkemail&#39;] ) &amp;&amp; &#39;registered&#39; == $_GET[&#39;checkemail&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;registered&#39;, __( &#39;Registration complete. Please check your email.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( strpos( $redirect_to, &#39;about.php?updated&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;updated&#39;, __( &#39;&lt;strong&gt;You have successfully updated WordPress!&lt;/strong&gt; Please log back in to see what&amp;#8217;s new.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( WP_Recovery_Mode_Link_Service::LOGIN_ACTION_ENTERED === $action ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors&ndash;&gt;add( &#39;enter_recovery_mode&#39;, __( &#39;Recovery Mode Initialized. Please log in to continue.&#39; ), &#39;message&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the login page errors.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.6.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param object $errors      WP Error object.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $redirect_to Redirect destination URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = apply_filters( &#39;wp_login_errors&#39;, $errors, $redirect_to );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Clear any stale cookies.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $reauth ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_clear_auth_cookie();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_header( __( &#39;Log In&#39; ), &#39;&#39;, $errors );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;log&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_login = ( &#39;incorrect_password&#39; == $errors&ndash;&gt;get_error_code() || &#39;empty_password&#39; == $errors&ndash;&gt;get_error_code() ) ? esc_attr( wp_unslash( $_POST[&#39;log&#39;] ) ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$rememberme = ! empty( $_POST[&#39;rememberme&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_describedby_error = &#39; aria&ndash;describedby=&quot;login_error&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_describedby_error = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;form name=&quot;loginform&quot; id=&quot;loginform&quot; action=&quot;&lt;?php echo esc_url( site_url( &#39;wp&ndash;login.php&#39;, &#39;login_post&#39; ) ); ?&gt;&quot; method=&quot;post&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;user_login&quot;&gt;&lt;?php _e( &#39;Username or Email Address&#39; ); ?&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;log&quot; id=&quot;user_login&quot;&lt;?php echo $aria_describedby_error; ?&gt; class=&quot;input&quot; value=&quot;&lt;?php echo esc_attr( $user_login ); ?&gt;&quot; size=&quot;20&quot; autocapitalize=&quot;off&quot; /&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;user_pass&quot;&gt;&lt;?php _e( &#39;Password&#39; ); ?&gt;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;password&quot; name=&quot;pwd&quot; id=&quot;user_pass&quot;&lt;?php echo $aria_describedby_error; ?&gt; class=&quot;input&quot; value=&quot;&quot; size=&quot;20&quot; /&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires following the &#39;Password&#39; field in the login form.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;login_form&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;forgetmenot&quot;&gt;&lt;label for=&quot;rememberme&quot;&gt;&lt;input name=&quot;rememberme&quot; type=&quot;checkbox&quot; id=&quot;rememberme&quot; value=&quot;forever&quot; &lt;?php checked( $rememberme ); ?&gt; /&gt; &lt;?php esc_html_e( &#39;Remember Me&#39; ); ?&gt;&lt;/label&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;submit&quot; name=&quot;wp&ndash;submit&quot; id=&quot;wp&ndash;submit&quot; class=&quot;button button&ndash;primary button&ndash;large&quot; value=&quot;&lt;?php esc_attr_e( &#39;Log In&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php	if ( $interim_login ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;interim&ndash;login&quot; value=&quot;1&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php	} else { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;redirect_to&quot; value=&quot;&lt;?php echo esc_attr( $redirect_to ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( $customize_login ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;customize&ndash;login&quot; value=&quot;1&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;testcookie&quot; value=&quot;1&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( ! $interim_login ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p id=&quot;nav&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! isset( $_GET[&#39;checkemail&#39;] ) || ! in_array( $_GET[&#39;checkemail&#39;], array( &#39;confirm&#39;, &#39;newpass&#39; ) ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( get_option( &#39;users_can_register&#39; ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$registration_url = sprintf( &#39;&lt;a href=&quot;%s&quot;&gt;%s&lt;/a&gt;&#39;, esc_url( wp_registration_url() ), __( &#39;Register&#39; ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;includes/general&ndash;template.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;register&#39;, $registration_url );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo esc_html( $login_link_separator );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;endif;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo esc_url( wp_lostpassword_url() ); ?&gt;&quot;&gt;&lt;?php _e( &#39;Lost your password?&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;function wp_attempt_focus(){<br/>
+&nbsp;&nbsp;&nbsp;setTimeout( function(){ try{<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( $user_login ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;d = document.getElementById(&#39;user_pass&#39;);<br/>
+&nbsp;&nbsp;&nbsp;d.value = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } else { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;d = document.getElementById(&#39;user_login&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( &#39;invalid_username&#39; == $errors&ndash;&gt;get_error_code() ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;if( d.value != &#39;&#39; )<br/>
+&nbsp;&nbsp;&nbsp;d.value = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;d.focus();<br/>
+&nbsp;&nbsp;&nbsp;d.select();<br/>
+&nbsp;&nbsp;&nbsp;} catch(e){}<br/>
+&nbsp;&nbsp;&nbsp;}, 200);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters whether to print the call to `wp_attempt_focus()` on the login screen.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 4.8.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param bool $print Whether to print the function call. Default true.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( apply_filters( &#39;enable_login_autofocus&#39;, true ) &amp;&amp; ! $error ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;wp_attempt_focus();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;if(typeof wpOnload==&#39;function&#39;)wpOnload();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( $interim_login ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;(function(){<br/>
+&nbsp;&nbsp;&nbsp;try {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var i, links = document.getElementsByTagName(&#39;a&#39;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for ( i in links ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( links[i].href )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;links[i].target = &#39;_blank&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;} catch(e){}<br/>
+&nbsp;&nbsp;&nbsp;}());<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/script&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login_footer();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+} // End action switch.</body></html>

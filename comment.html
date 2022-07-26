@@ -1,0 +1,362 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Comment Management Screen<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** Load WordPress Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+$parent_file  = &#39;edit&ndash;comments.php&#39;;<br/>
+$submenu_file = &#39;edit&ndash;comments.php&#39;;<br/>
+<br/>
+/**<br/>
+ * @global string $action<br/>
+ */<br/>
+global $action;<br/>
+wp_reset_vars( array( &#39;action&#39; ) );<br/>
+<br/>
+if ( isset( $_POST[&#39;deletecomment&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$action = &#39;deletecomment&#39;;<br/>
+}<br/>
+<br/>
+if ( &#39;cdc&#39; == $action ) {<br/>
+&nbsp;&nbsp;&nbsp;$action = &#39;delete&#39;;<br/>
+} elseif ( &#39;mac&#39; == $action ) {<br/>
+&nbsp;&nbsp;&nbsp;$action = &#39;approve&#39;;<br/>
+}<br/>
+<br/>
+if ( isset( $_GET[&#39;dt&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;spam&#39; == $_GET[&#39;dt&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$action = &#39;spam&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( &#39;trash&#39; == $_GET[&#39;dt&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$action = &#39;trash&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+switch ( $action ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;editcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = __( &#39;Edit Comment&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  &#39;&lt;p&gt;&#39; . __( &#39;You can edit the information left in a comment if needed. This is often useful when you notice that a commenter has made a typographical error.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  &#39;&lt;p&gt;&#39; . __( &#39;You can also moderate the comment from this screen using the Status box, where you can also change the timestamp of the comment.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Administration_Screens#Comments&quot;&gt;Documentation on Comments&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;comment&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_id = absint( $_GET[&#39;c&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $comment = get_comment( $comment_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comment_footer_die( __( &#39;Invalid comment ID.&#39; ) . sprintf( &#39; &lt;a href=&quot;%s&quot;&gt;&#39; . __( &#39;Go back&#39; ) . &#39;&lt;/a&gt;.&#39;, &#39;javascript:history.go(&ndash;1)&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_comment&#39;, $comment_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comment_footer_die( __( &#39;Sorry, you are not allowed to edit this comment.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;trash&#39; == $comment&ndash;&gt;comment_approved ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comment_footer_die( __( &#39;This comment is in the Trash. Please move it out of the Trash if you want to edit it.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment = get_comment_to_edit( $comment_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include( ABSPATH . &#39;wp&ndash;admin/edit&ndash;form&ndash;comment.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;delete&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;approve&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;trash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;spam&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = __( &#39;Moderate Comment&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_id = absint( $_GET[&#39;c&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $comment = get_comment( $comment_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;edit&ndash;comments.php?error=1&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_comment&#39;, $comment&ndash;&gt;comment_ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;edit&ndash;comments.php?error=2&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// No need to re&ndash;approve/re&ndash;trash/re&ndash;spam a comment.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $action == str_replace( &#39;1&#39;, &#39;approve&#39;, $comment&ndash;&gt;comment_approved ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( admin_url( &#39;edit&ndash;comments.php?same=&#39; . $comment_id ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$formaction    = $action . &#39;comment&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$nonce_action  = &#39;approve&#39; == $action ? &#39;approve&ndash;comment_&#39; : &#39;delete&ndash;comment_&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$nonce_action .= $comment_id;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;wrap&quot;&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;h1&gt;&lt;?php echo esc_html( $title ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch ( $action ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;spam&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$caution_msg = __( &#39;You are about to mark the following comment as spam:&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$button      = _x( &#39;Mark as Spam&#39;, &#39;comment&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;trash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$caution_msg = __( &#39;You are about to move the following comment to the Trash:&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$button      = __( &#39;Move to Trash&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;delete&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$caution_msg = __( &#39;You are about to delete the following comment:&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$button      = __( &#39;Permanently Delete Comment&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$caution_msg = __( &#39;You are about to approve the following comment:&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$button      = __( &#39;Approve Comment&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $comment&ndash;&gt;comment_approved != &#39;0&#39; ) { // if not unapproved<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch ( $comment&ndash;&gt;comment_approved ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;1&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message = __( &#39;This comment is currently approved.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;spam&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message = __( &#39;This comment is currently marked as spam.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;trash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$message = __( &#39;This comment is currently in the Trash.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $message ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div id=&quot;message&quot; class=&quot;notice notice&ndash;info&quot;&gt;&lt;p&gt;&#39; . $message . &#39;&lt;/p&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;div id=&quot;message&quot; class=&quot;notice notice&ndash;warning&quot;&gt;&lt;p&gt;&lt;strong&gt;&lt;?php _e( &#39;Caution:&#39; ); ?&gt;&lt;/strong&gt; &lt;?php echo $caution_msg; ?&gt;&lt;/p&gt;&lt;/div&gt;<br/>
+<br/>
+&lt;table class=&quot;form&ndash;table comment&ndash;ays&quot;&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Author&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;?php comment_author( $comment ); ?&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( get_comment_author_email( $comment ) ) { ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Email&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;?php comment_author_email( $comment ); ?&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( get_comment_author_url( $comment ) ) { ?&gt;<br/>
+&lt;tr&gt;<br/>
+&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;URL&#39; ); ?&gt;&lt;/th&gt;<br/>
+&lt;td&gt;&lt;a href=&quot;&lt;?php comment_author_url( $comment ); ?&gt;&quot;&gt;&lt;?php comment_author_url( $comment ); ?&gt;&lt;/a&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;?php } ?&gt;<br/>
+&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;?php /* translators: column name or table row header */ _e( &#39;In Response To&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_id = $comment&ndash;&gt;comment_post_ID;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( current_user_can( &#39;edit_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_link  = &quot;&lt;a href=&#39;&quot; . esc_url( get_edit_post_link( $post_id ) ) . &quot;&#39;&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_link .= esc_html( get_the_title( $post_id ) ) . &#39;&lt;/a&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$post_link = esc_html( get_the_title( $post_id ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo $post_link;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $comment&ndash;&gt;comment_parent ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$parent      = get_comment( $comment&ndash;&gt;comment_parent );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$parent_link = esc_url( get_comment_link( $parent ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$name        = get_comment_author( $parent );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: comment link */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39; | &#39; . __( &#39;In reply to %s.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;a href=&quot;&#39; . $parent_link . &#39;&quot;&gt;&#39; . $name . &#39;&lt;/a&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;?php _e( &#39;Submitted on&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: comment date, 2: comment time */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submitted = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;%1$s at %2$s&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: comment date format. See https://secure.php.net/date */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_comment_date( __( &#39;Y/m/d&#39; ), $comment ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_comment_date( __( &#39;g:i a&#39; ), $comment )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;approved&#39; === wp_get_comment_status( $comment ) &amp;&amp; ! empty( $comment&ndash;&gt;comment_post_ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;a href=&quot;&#39; . esc_url( get_comment_link( $comment ) ) . &#39;&quot;&gt;&#39; . $submitted . &#39;&lt;/a&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo $submitted;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;th scope=&quot;row&quot;&gt;&lt;?php /* translators: field name in comment form */ _ex( &#39;Comment&#39;, &#39;noun&#39; ); ?&gt;&lt;/th&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td class=&quot;comment&ndash;content&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php comment_text( $comment ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p class=&quot;edit&ndash;comment&quot;&gt;&lt;a href=&quot;&lt;?php echo admin_url( &quot;comment.php?action=editcomment&amp;amp;c={$comment&ndash;&gt;comment_ID}&quot; ); ?&gt;&quot;&gt;&lt;?php esc_html_e( &#39;Edit&#39; ); ?&gt;&lt;/a&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/table&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;form action=&quot;comment.php&quot; method=&quot;get&quot; class=&quot;comment&ndash;ays&ndash;submit&quot;&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( $button, &#39;primary&#39;, &#39;submit&#39;, false ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo admin_url( &#39;edit&ndash;comments.php&#39; ); ?&gt;&quot; class=&quot;button&ndash;cancel&quot;&gt;&lt;?php esc_html_e( &#39;Cancel&#39; ); ?&gt;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_nonce_field( $nonce_action ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;&lt;?php echo esc_attr( $formaction ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;c&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_ID ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;noredir&quot; value=&quot;1&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;deletecomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;trashcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;untrashcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;spamcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;unspamcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;approvecomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;case &#39;unapprovecomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_id = absint( $_REQUEST[&#39;c&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $action, array( &#39;approvecomment&#39;, &#39;unapprovecomment&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;approve&ndash;comment_&#39; . $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;delete&ndash;comment_&#39; . $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$noredir = isset( $_REQUEST[&#39;noredir&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! $comment = get_comment( $comment_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comment_footer_die( __( &#39;Invalid comment ID.&#39; ) . sprintf( &#39; &lt;a href=&quot;%s&quot;&gt;&#39; . __( &#39;Go back&#39; ) . &#39;&lt;/a&gt;.&#39;, &#39;edit&ndash;comments.php&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_comment&#39;, $comment&ndash;&gt;comment_ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comment_footer_die( __( &#39;Sorry, you are not allowed to edit comments on this post.&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;&#39; != wp_get_referer() &amp;&amp; ! $noredir &amp;&amp; false === strpos( wp_get_referer(), &#39;comment.php&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = wp_get_referer();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( &#39;&#39; != wp_get_original_referer() &amp;&amp; ! $noredir ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = wp_get_original_referer();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( in_array( $action, array( &#39;approvecomment&#39;, &#39;unapprovecomment&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = admin_url( &#39;edit&ndash;comments.php?p=&#39; . absint( $comment&ndash;&gt;comment_post_ID ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = admin_url( &#39;edit&ndash;comments.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = remove_query_arg( array( &#39;spammed&#39;, &#39;unspammed&#39;, &#39;trashed&#39;, &#39;untrashed&#39;, &#39;deleted&#39;, &#39;ids&#39;, &#39;approved&#39;, &#39;unapproved&#39; ), $redir );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch ( $action ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;deletecomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_delete_comment( $comment );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg( array( &#39;deleted&#39; =&gt; &#39;1&#39; ), $redir );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;trashcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_trash_comment( $comment );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;trashed&#39; =&gt; &#39;1&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;ids&#39;     =&gt; $comment_id,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;untrashcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_untrash_comment( $comment );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg( array( &#39;untrashed&#39; =&gt; &#39;1&#39; ), $redir );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;spamcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_spam_comment( $comment );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;spammed&#39; =&gt; &#39;1&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;ids&#39;     =&gt; $comment_id,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;unspamcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_unspam_comment( $comment );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg( array( &#39;unspammed&#39; =&gt; &#39;1&#39; ), $redir );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;approvecomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_set_comment_status( $comment, &#39;approve&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg( array( &#39;approved&#39; =&gt; 1 ), $redir );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;unapprovecomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_set_comment_status( $comment, &#39;hold&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redir = add_query_arg( array( &#39;unapproved&#39; =&gt; 1 ), $redir );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( $redir );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;case &#39;editedcomment&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_id      = absint( $_POST[&#39;comment_ID&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_post_id = absint( $_POST[&#39;comment_post_ID&#39;] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;update&ndash;comment_&#39; . $comment_id );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;edit_comment();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$location = ( empty( $_POST[&#39;referredby&#39;] ) ? &quot;edit&ndash;comments.php?p=$comment_post_id&quot; : $_POST[&#39;referredby&#39;] ) . &#39;#comment&ndash;&#39; . $comment_id;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Filters the URI the user is redirected to after editing a comment in the admin.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $location The URI the user will be redirected to.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param int $comment_id The ID of the comment being edited.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$location = apply_filters( &#39;comment_edit_redirect&#39;, $location, $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_redirect( $location );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Unknown action.&#39; ) );<br/>
+<br/>
+} // end switch<br/>
+<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );</body></html>

@@ -1,0 +1,220 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Confirms that the activation key that is sent in an email after a user signs<br/>
+ * up for a new site matches the key for that user and then displays confirmation.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+define( &#39;WP_INSTALLING&#39;, true );<br/>
+<br/>
+/** Sets up the WordPress Environment. */<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;blog&ndash;header.php&#39; );<br/>
+<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( wp_registration_url() );<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+$valid_error_codes = array( &#39;already_active&#39;, &#39;blog_taken&#39; );<br/>
+<br/>
+list( $activate_path ) = explode( &#39;?&#39;, wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) );<br/>
+$activate_cookie       = &#39;wp&ndash;activate&ndash;&#39; . COOKIEHASH;<br/>
+<br/>
+$key    = &#39;&#39;;<br/>
+$result = null;<br/>
+<br/>
+if ( isset( $_GET[&#39;key&#39;] ) &amp;&amp; isset( $_POST[&#39;key&#39;] ) &amp;&amp; $_GET[&#39;key&#39;] !== $_POST[&#39;key&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;A key value mismatch has been detected. Please follow the link provided in your activation email.&#39; ), __( &#39;An error occurred during the activation&#39; ), 400 );<br/>
+} elseif ( ! empty( $_GET[&#39;key&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$key = $_GET[&#39;key&#39;];<br/>
+} elseif ( ! empty( $_POST[&#39;key&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$key = $_POST[&#39;key&#39;];<br/>
+}<br/>
+<br/>
+if ( $key ) {<br/>
+&nbsp;&nbsp;&nbsp;$redirect_url = remove_query_arg( &#39;key&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $redirect_url !== remove_query_arg( false ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setcookie( $activate_cookie, $key, 0, $activate_path, COOKIE_DOMAIN, is_ssl(), true );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( $redirect_url );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$result = wpmu_activate_signup( $key );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( $result === null &amp;&amp; isset( $_COOKIE[ $activate_cookie ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$key    = $_COOKIE[ $activate_cookie ];<br/>
+&nbsp;&nbsp;&nbsp;$result = wpmu_activate_signup( $key );<br/>
+&nbsp;&nbsp;&nbsp;setcookie( $activate_cookie, &#39; &#39;, time() &ndash; YEAR_IN_SECONDS, $activate_path, COOKIE_DOMAIN, is_ssl(), true );<br/>
+}<br/>
+<br/>
+if ( $result === null || ( is_wp_error( $result ) &amp;&amp; &#39;invalid_key&#39; === $result&ndash;&gt;get_error_code() ) ) {<br/>
+&nbsp;&nbsp;&nbsp;status_header( 404 );<br/>
+} elseif ( is_wp_error( $result ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$error_code = $result&ndash;&gt;get_error_code();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! in_array( $error_code, $valid_error_codes ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;status_header( 400 );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+if ( is_object( $wp_object_cache ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$wp_object_cache&ndash;&gt;cache_enabled = false;<br/>
+}<br/>
+<br/>
+// Fix for page title<br/>
+$wp_query&ndash;&gt;is_404 = false;<br/>
+<br/>
+/**<br/>
+ * Fires before the Site Activation page is loaded.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+do_action( &#39;activate_header&#39; );<br/>
+<br/>
+/**<br/>
+ * Adds an action hook specific to this page.<br/>
+ *<br/>
+ * Fires on {@see &#39;wp_head&#39;}.<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ */<br/>
+function do_activate_header() {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires before the Site Activation page is loaded.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Fires on the {@see &#39;wp_head&#39;} action.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;activate_wp_head&#39; );<br/>
+}<br/>
+add_action( &#39;wp_head&#39;, &#39;do_activate_header&#39; );<br/>
+<br/>
+/**<br/>
+ * Loads styles specific to this page.<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ */<br/>
+function wpmu_activate_stylesheet() {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;style type=&quot;text/css&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;form { margin&ndash;top: 2em; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#submit, #key { width: 90%; font&ndash;size: 24px; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#language { margin&ndash;top: .5em; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.error { background: #f66; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;span.h3 { padding: 0 8px; font&ndash;size: 1.3em; font&ndash;weight: 600; }<br/>
+&nbsp;&nbsp;&nbsp;&lt;/style&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+add_action( &#39;wp_head&#39;, &#39;wpmu_activate_stylesheet&#39; );<br/>
+add_action( &#39;wp_head&#39;, &#39;wp_sensitive_page_meta&#39; );<br/>
+<br/>
+get_header( &#39;wp&ndash;activate&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;signup&ndash;content&quot; class=&quot;widecolumn&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;wp&ndash;activate&ndash;container&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php if ( ! $key ) { ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h2&gt;&lt;?php _e( &#39;Activation Key Required&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;form name=&quot;activateform&quot; id=&quot;activateform&quot; method=&quot;post&quot; action=&quot;&lt;?php echo network_site_url( &#39;wp&ndash;activate.php&#39; ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;key&quot;&gt;&lt;?php _e( &#39;Activation Key:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;br /&gt;&lt;input type=&quot;text&quot; name=&quot;key&quot; id=&quot;key&quot; value=&quot;&quot; size=&quot;50&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;submit&quot; type=&quot;submit&quot; name=&quot;Submit&quot; class=&quot;submit&quot; value=&quot;&lt;?php esc_attr_e( &#39;Activate&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_wp_error( $result ) &amp;&amp; in_array( $result&ndash;&gt;get_error_code(), $valid_error_codes ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$signup = $result&ndash;&gt;get_error_data();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h2&gt;&lt;?php _e( &#39;Your account is now active!&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;lead&ndash;in&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $signup&ndash;&gt;domain . $signup&ndash;&gt;path == &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: login URL, 2: username, 3: user email, 4: lost password URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Your account has been activated. You may now &lt;a href=&quot;%1$s&quot;&gt;log in&lt;/a&gt; to the site using your chosen username of &amp;#8220;%2$s&amp;#8221;. Please check your email inbox at %3$s for your password and login instructions. If you do not receive an email, please check your junk or spam folder. If you still do not receive an email within an hour, you can &lt;a href=&quot;%4$s&quot;&gt;reset your password&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;network_site_url( &#39;wp&ndash;login.php&#39;, &#39;login&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$signup&ndash;&gt;user_login,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$signup&ndash;&gt;user_email,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_lostpassword_url()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: site URL, 2: username, 3: user email, 4: lost password URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Your site at %1$s is active. You may now log in to your site using your chosen username of &amp;#8220;%2$s&amp;#8221;. Please check your email inbox at %3$s for your password and login instructions. If you do not receive an email, please check your junk or spam folder. If you still do not receive an email within an hour, you can &lt;a href=&quot;%4$s&quot;&gt;reset your password&lt;/a&gt;.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf( &#39;&lt;a href=&quot;http://%1$s&quot;&gt;%1$s&lt;/a&gt;&#39;, $signup&ndash;&gt;domain ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$signup&ndash;&gt;user_login,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$signup&ndash;&gt;user_email,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_lostpassword_url()<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $result === null || is_wp_error( $result ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h2&gt;&lt;?php _e( &#39;An error occurred during the activation&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( is_wp_error( $result ) ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php echo $result&ndash;&gt;get_error_message(); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$url  = isset( $result[&#39;blog_id&#39;] ) ? get_home_url( (int) $result[&#39;blog_id&#39;] ) : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = get_userdata( (int) $result[&#39;user_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;h2&gt;&lt;?php _e( &#39;Your account is now active!&#39; ); ?&gt;&lt;/h2&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;signup&ndash;welcome&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;span class=&quot;h3&quot;&gt;&lt;?php _e( &#39;Username:&#39; ); ?&gt;&lt;/span&gt; &lt;?php echo $user&ndash;&gt;user_login; ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;span class=&quot;h3&quot;&gt;&lt;?php _e( &#39;Password:&#39; ); ?&gt;&lt;/span&gt; &lt;?php echo $result[&#39;password&#39;]; ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $url &amp;&amp; $url != network_home_url( &#39;&#39;, &#39;http&#39; ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch_to_blog( (int) $result[&#39;blog_id&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$login_url = wp_login_url();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;restore_current_blog();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;view&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: site URL, 2: login URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Your account is now activated. &lt;a href=&quot;%1$s&quot;&gt;View your site&lt;/a&gt; or &lt;a href=&quot;%2$s&quot;&gt;Log in&lt;/a&gt;&#39; ), $url, esc_url( $login_url ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php else : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;view&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: login URL, 2: network home URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Your account is now activated. &lt;a href=&quot;%1$s&quot;&gt;Log in&lt;/a&gt; or go back to the &lt;a href=&quot;%2$s&quot;&gt;homepage&lt;/a&gt;.&#39; ), network_site_url( &#39;wp&ndash;login.php&#39;, &#39;login&#39; ), network_home_url() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;endif;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;var key_input = document.getElementById(&#39;key&#39;);<br/>
+&nbsp;&nbsp;&nbsp;key_input &amp;&amp; key_input.focus();<br/>
+&lt;/script&gt;<br/>
+&lt;?php<br/>
+get_footer( &#39;wp&ndash;activate&#39; );</body></html>

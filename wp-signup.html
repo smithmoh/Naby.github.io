@@ -1,0 +1,1016 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+<br/>
+/** Sets up the WordPress Environment. */<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+add_action( &#39;wp_head&#39;, &#39;wp_no_robots&#39; );<br/>
+<br/>
+require( dirname( __FILE__ ) . &#39;/wp&ndash;blog&ndash;header.php&#39; );<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+if ( is_array( get_site_option( &#39;illegal_names&#39; ) ) &amp;&amp; isset( $_GET[&#39;new&#39;] ) &amp;&amp; in_array( $_GET[&#39;new&#39;], get_site_option( &#39;illegal_names&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( network_home_url() );<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Prints signup_header via wp_head<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ */<br/>
+function do_signup_header() {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires within the head section of the site sign&ndash;up screen.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;signup_header&#39; );<br/>
+}<br/>
+add_action( &#39;wp_head&#39;, &#39;do_signup_header&#39; );<br/>
+<br/>
+if ( ! is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( wp_registration_url() );<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+if ( ! is_main_site() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( network_site_url( &#39;wp&ndash;signup.php&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;die();<br/>
+}<br/>
+<br/>
+// Fix for page title<br/>
+$wp_query&ndash;&gt;is_404 = false;<br/>
+<br/>
+/**<br/>
+ * Fires before the Site Signup page is loaded.<br/>
+ *<br/>
+ * @since 4.4.0<br/>
+ */<br/>
+do_action( &#39;before_signup_header&#39; );<br/>
+<br/>
+/**<br/>
+ * Prints styles for front&ndash;end Multisite signup pages<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ */<br/>
+function wpmu_signup_stylesheet() {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;style type=&quot;text/css&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register { width: 90%; margin:0 auto; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register form { margin&ndash;top: 2em; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register .error { font&ndash;weight: 600; padding: 10px; color: #333333; background: #FFEBE8; border: 1px solid #CC0000; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register input[type=&quot;submit&quot;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register #blog_title,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register #user_email,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register #blogname,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register #user_name { width:100%; font&ndash;size: 24px; margin:5px 0; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register #site&ndash;language { display: block; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register .prefix_address,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register .suffix_address { font&ndash;size: 18px; display:inline; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register label { font&ndash;weight: 600; font&ndash;size: 15px; display: block; margin: 10px 0; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register label.checkbox { display:inline; }<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.mu_register .mu_alert { font&ndash;weight: 600; padding: 10px; color: #333333; background: #ffffe0; border: 1px solid #e6db55; }<br/>
+&nbsp;&nbsp;&nbsp;&lt;/style&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+add_action( &#39;wp_head&#39;, &#39;wpmu_signup_stylesheet&#39; );<br/>
+get_header( &#39;wp&ndash;signup&#39; );<br/>
+<br/>
+/**<br/>
+ * Fires before the site sign&ndash;up form.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+do_action( &#39;before_signup_form&#39; );<br/>
+?&gt;<br/>
+&lt;div id=&quot;signup&ndash;content&quot; class=&quot;widecolumn&quot;&gt;<br/>
+&lt;div class=&quot;mu_register wp&ndash;signup&ndash;container&quot;&gt;<br/>
+&lt;?php<br/>
+/**<br/>
+ * Generates and displays the Signup and Create Site forms<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string          $blogname   The new site name.<br/>
+ * @param string          $blog_title The new site title.<br/>
+ * @param WP_Error|string $errors     A WP_Error object containing existing errors. Defaults to empty string.<br/>
+ */<br/>
+function show_blog_form( $blogname = &#39;&#39;, $blog_title = &#39;&#39;, $errors = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$current_network = get_network();<br/>
+&nbsp;&nbsp;&nbsp;// Blog name.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_subdomain_install() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;label for=&quot;blogname&quot;&gt;&#39; . __( &#39;Site Name:&#39; ) . &#39;&lt;/label&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;label for=&quot;blogname&quot;&gt;&#39; . __( &#39;Site Domain:&#39; ) . &#39;&lt;/label&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$errmsg = $errors&ndash;&gt;get_error_message( &#39;blogname&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( $errmsg ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;error&quot;&gt;&lt;?php echo $errmsg; ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_subdomain_install() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;span class=&quot;prefix_address&quot;&gt;&#39; . $current_network&ndash;&gt;domain . $current_network&ndash;&gt;path . &#39;&lt;/span&gt;&lt;input name=&quot;blogname&quot; type=&quot;text&quot; id=&quot;blogname&quot; value=&quot;&#39; . esc_attr( $blogname ) . &#39;&quot; maxlength=&quot;60&quot; /&gt;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$site_domain = preg_replace( &#39;|^www\.|&#39;, &#39;&#39;, $current_network&ndash;&gt;domain );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;input name=&quot;blogname&quot; type=&quot;text&quot; id=&quot;blogname&quot; value=&quot;&#39; . esc_attr( $blogname ) . &#39;&quot; maxlength=&quot;60&quot; /&gt;&lt;span class=&quot;suffix_address&quot;&gt;.&#39; . esc_html( $site_domain ) . &#39;&lt;/span&gt;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_user_logged_in() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! is_subdomain_install() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$site = $current_network&ndash;&gt;domain . $current_network&ndash;&gt;path . __( &#39;sitename&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$site = __( &#39;domain&#39; ) . &#39;.&#39; . $site_domain . $current_network&ndash;&gt;path;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site address */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p&gt;(&lt;strong&gt;&#39; . sprintf( __( &#39;Your address will be %s.&#39; ), $site ) . &#39;&lt;/strong&gt;) &#39; . __( &#39;Must be at least 4 characters, letters and numbers only. It cannot be changed, so choose carefully!&#39; ) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Blog Title<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;label for=&quot;blog_title&quot;&gt;&lt;?php _e( &#39;Site Title:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;$errmsg = $errors&ndash;&gt;get_error_message( &#39;blog_title&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( $errmsg ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;error&quot;&gt;&lt;?php echo $errmsg; ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;input name=&quot;blog_title&quot; type=&quot;text&quot; id=&quot;blog_title&quot; value=&quot;&#39; . esc_attr( $blog_title ) . &#39;&quot; /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;// Site Language.<br/>
+&nbsp;&nbsp;&nbsp;$languages = signup_get_available_languages();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $languages ) ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;site&ndash;language&quot;&gt;&lt;?php _e( &#39;Site Language:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Network default.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$lang = get_site_option( &#39;WPLANG&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;WPLANG&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$lang = $_POST[&#39;WPLANG&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Use US English if the default isn&#39;t available.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! in_array( $lang, $languages ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$lang = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_dropdown_languages(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;name&#39;                        =&gt; &#39;WPLANG&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;                          =&gt; &#39;site&ndash;language&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;selected&#39;                    =&gt; $lang,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;languages&#39;                   =&gt; $languages,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;show_available_translations&#39; =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;endif; // Languages.<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_public_on_checked  = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_public_off_checked = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;if ( isset( $_POST[&#39;blog_public&#39;] ) &amp;&amp; &#39;0&#39; == $_POST[&#39;blog_public&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_public_off_checked = &#39;checked=&quot;checked&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_public_on_checked = &#39;checked=&quot;checked&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;privacy&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;privacy&ndash;intro&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label for=&quot;blog_public_on&quot;&gt;&lt;?php _e( &#39;Privacy:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;Allow search engines to index this site.&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;br style=&quot;clear:both&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label class=&quot;checkbox&quot; for=&quot;blog_public_on&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;radio&quot; id=&quot;blog_public_on&quot; name=&quot;blog_public&quot; value=&quot;1&quot; &lt;?php echo $blog_public_on_checked; ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;strong&gt;&lt;?php _e( &#39;Yes&#39; ); ?&gt;&lt;/strong&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label class=&quot;checkbox&quot; for=&quot;blog_public_off&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;radio&quot; id=&quot;blog_public_off&quot; name=&quot;blog_public&quot; value=&quot;0&quot; &lt;?php echo $blog_public_off_checked; ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;strong&gt;&lt;?php _e( &#39;No&#39; ); ?&gt;&lt;/strong&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires after the site sign&ndash;up form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param WP_Error $errors A WP_Error object possibly containing &#39;blogname&#39; or &#39;blog_title&#39; errors.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;signup_blogform&#39;, $errors );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Validate the new site signup<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @return array Contains the new site data and error messages.<br/>
+ */<br/>
+function validate_blog_form() {<br/>
+&nbsp;&nbsp;&nbsp;$user = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;if ( is_user_logged_in() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user = wp_get_current_user();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;return wpmu_validate_blog_signup( $_POST[&#39;blogname&#39;], $_POST[&#39;blog_title&#39;], $user );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Display user registration form<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string          $user_name  The entered username.<br/>
+ * @param string          $user_email The entered email address.<br/>
+ * @param WP_Error|string $errors     A WP_Error object containing existing errors. Defaults to empty string.<br/>
+ */<br/>
+function show_user_form( $user_name = &#39;&#39;, $user_email = &#39;&#39;, $errors = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// User name<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;label for=&quot;user_name&quot;&gt;&#39; . __( &#39;Username:&#39; ) . &#39;&lt;/label&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$errmsg = $errors&ndash;&gt;get_error_message( &#39;user_name&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( $errmsg ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;error&quot;&gt;&#39; . $errmsg . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;input name=&quot;user_name&quot; type=&quot;text&quot; id=&quot;user_name&quot; value=&quot;&#39; . esc_attr( $user_name ) . &#39;&quot; autocapitalize=&quot;none&quot; autocorrect=&quot;off&quot; maxlength=&quot;60&quot; /&gt;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;_e( &#39;(Must be at least 4 characters, letters and numbers only.)&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;label for=&quot;user_email&quot;&gt;&lt;?php _e( &#39;Email&amp;nbsp;Address:&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;$errmsg = $errors&ndash;&gt;get_error_message( &#39;user_email&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( $errmsg ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;error&quot;&gt;&lt;?php echo $errmsg; ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input name=&quot;user_email&quot; type=&quot;email&quot; id=&quot;user_email&quot; value=&quot;&lt;?php echo esc_attr( $user_email ); ?&gt;&quot; maxlength=&quot;200&quot; /&gt;&lt;br /&gt;&lt;?php _e( &#39;We send your registration email to this address. (Double&ndash;check your email address before continuing.)&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;$errmsg = $errors&ndash;&gt;get_error_message( &#39;generic&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( $errmsg ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p class=&quot;error&quot;&gt;&#39; . $errmsg . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires at the end of the user registration form on the site sign&ndash;up form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param WP_Error $errors A WP_Error object containing &#39;user_name&#39; or &#39;user_email&#39; errors.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;signup_extra_fields&#39;, $errors );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Validate user signup name and email<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @return array Contains username, email, and error messages.<br/>
+ */<br/>
+function validate_user_form() {<br/>
+&nbsp;&nbsp;&nbsp;return wpmu_validate_user_signup( $_POST[&#39;user_name&#39;], $_POST[&#39;user_email&#39;] );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Allow returning users to sign up for another site<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string          $blogname   The new site name<br/>
+ * @param string          $blog_title The new site title.<br/>
+ * @param WP_Error|string $errors     A WP_Error object containing existing errors. Defaults to empty string.<br/>
+ */<br/>
+function signup_another_blog( $blogname = &#39;&#39;, $blog_title = &#39;&#39;, $errors = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;$current_user = wp_get_current_user();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$signup_defaults = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;blogname&#39;   =&gt; $blogname,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;blog_title&#39; =&gt; $blog_title,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;errors&#39;     =&gt; $errors,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the default site sign&ndash;up variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $signup_defaults {<br/>
+&nbsp;&nbsp;&nbsp; *     An array of default site sign&ndash;up variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $blogname   The site blogname.<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $blog_title The site title.<br/>
+&nbsp;&nbsp;&nbsp; *     @type WP_Error $errors     A WP_Error object possibly containing &#39;blogname&#39; or &#39;blog_title&#39; errors.<br/>
+&nbsp;&nbsp;&nbsp; * }<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$filtered_results = apply_filters( &#39;signup_another_blog_init&#39;, $signup_defaults );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$blogname   = $filtered_results[&#39;blogname&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blog_title = $filtered_results[&#39;blog_title&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$errors     = $filtered_results[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: Network&#39;s site name. */<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;h2&gt;&#39; . sprintf( __( &#39;Get &lt;em&gt;another&lt;/em&gt; %s site in seconds&#39; ), get_network()&ndash;&gt;site_name ) . &#39;&lt;/h2&gt;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;p&gt;&#39; . __( &#39;There was a problem, please correct the form below and try again.&#39; ) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: Current user&#39;s display name. */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Welcome back, %s. By filling out the form below, you can &lt;strong&gt;add another site to your account&lt;/strong&gt;. There is no limit to the number of sites you can have, so create to your heart&amp;#8217;s content, but write responsibly!&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$current_user&ndash;&gt;display_name<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;$blogs = get_blogs_of_user( $current_user&ndash;&gt;ID );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $blogs ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Sites you are already a member of:&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ul&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $blogs as $blog ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$home_url = get_home_url( $blog&ndash;&gt;userblog_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;li&gt;&lt;a href=&quot;&#39; . esc_url( $home_url ) . &#39;&quot;&gt;&#39; . $home_url . &#39;&lt;/a&gt;&lt;/li&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/ul&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;If you&amp;#8217;re not going to use a great site domain, leave it for a new user. Now have at it!&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form id=&quot;setupform&quot; method=&quot;post&quot; action=&quot;wp&ndash;signup.php&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;stage&quot; value=&quot;gimmeanotherblog&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Hidden sign&ndash;up form fields output when creating another site or user.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since MU (3.0.0)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $context A string describing the steps of the sign&ndash;up process. The value can be<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *                        &#39;create&ndash;another&ndash;site&#39;, &#39;validate&ndash;user&#39;, or &#39;validate&ndash;site&#39;.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;signup_hidden_fields&#39;, &#39;create&ndash;another&ndash;site&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php show_blog_form( $blogname, $blog_title, $errors ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;&lt;input type=&quot;submit&quot; name=&quot;submit&quot; class=&quot;submit&quot; value=&quot;&lt;?php esc_attr_e( &#39;Create Site&#39; ); ?&gt;&quot; /&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Validate a new site signup for an existing user.<br/>
+ *<br/>
+ * @global string          $blogname   The new site&#39;s subdomain or directory name.<br/>
+ * @global string          $blog_title The new site&#39;s title.<br/>
+ * @global WP_Error        $errors     Existing errors in the global scope.<br/>
+ * @global string          $domain     The new site&#39;s domain.<br/>
+ * @global string          $path       The new site&#39;s path.<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @return null|bool True if site signup was validated, false if error.<br/>
+ *                   The function halts all execution if the user is not logged in.<br/>
+ */<br/>
+function validate_another_blog_signup() {<br/>
+&nbsp;&nbsp;&nbsp;global $blogname, $blog_title, $errors, $domain, $path;<br/>
+&nbsp;&nbsp;&nbsp;$current_user = wp_get_current_user();<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_user_logged_in() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;die();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$result = validate_blog_form();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Extracted values set/overwrite globals.<br/>
+&nbsp;&nbsp;&nbsp;$domain     = $result[&#39;domain&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$path       = $result[&#39;path&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blogname   = $result[&#39;blogname&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blog_title = $result[&#39;blog_title&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$errors     = $result[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_another_blog( $blogname, $blog_title, $errors );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$public = (int) $_POST[&#39;blog_public&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$blog_meta_defaults = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;lang_id&#39; =&gt; 1,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;public&#39;  =&gt; $public,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Handle the language setting for the new site.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $_POST[&#39;WPLANG&#39;] ) ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$languages = signup_get_available_languages();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $_POST[&#39;WPLANG&#39;], $languages ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$language = wp_unslash( sanitize_text_field( $_POST[&#39;WPLANG&#39;] ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $language ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_meta_defaults[&#39;WPLANG&#39;] = $language;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the new site meta variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Use the {@see &#39;add_signup_meta&#39;} filter instead.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since MU (3.0.0)<br/>
+&nbsp;&nbsp;&nbsp; * @deprecated 3.0.0 Use the {@see &#39;add_signup_meta&#39;} filter instead.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $blog_meta_defaults An array of default blog meta variables.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$meta_defaults = apply_filters( &#39;signup_create_blog_meta&#39;, $blog_meta_defaults );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the new default site meta variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $meta {<br/>
+&nbsp;&nbsp;&nbsp; *     An array of default site meta variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; *     @type int $lang_id     The language ID.<br/>
+&nbsp;&nbsp;&nbsp; *     @type int $blog_public Whether search engines should be discouraged from indexing the site. 1 for true, 0 for false.<br/>
+&nbsp;&nbsp;&nbsp; * }<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$meta = apply_filters( &#39;add_signup_meta&#39;, $meta_defaults );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$blog_id = wpmu_create_blog( $domain, $path, $blog_title, $current_user&ndash;&gt;ID, $meta, get_current_network_id() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( is_wp_error( $blog_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;confirm_another_blog_signup( $domain, $path, $blog_title, $current_user&ndash;&gt;user_login, $current_user&ndash;&gt;user_email, $meta, $blog_id );<br/>
+&nbsp;&nbsp;&nbsp;return true;<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Confirm a new site signup.<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ * @since 4.4.0 Added the `$blog_id` parameter.<br/>
+ *<br/>
+ * @param string $domain     The domain URL.<br/>
+ * @param string $path       The site root path.<br/>
+ * @param string $blog_title The site title.<br/>
+ * @param string $user_name  The username.<br/>
+ * @param string $user_email The user&#39;s email address.<br/>
+ * @param array  $meta       Any additional meta from the {@see &#39;add_signup_meta&#39;} filter in validate_blog_signup().<br/>
+ * @param int    $blog_id    The site ID.<br/>
+ */<br/>
+function confirm_another_blog_signup( $domain, $path, $blog_title, $user_name, $user_email = &#39;&#39;, $meta = array(), $blog_id = 0 ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $blog_id ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch_to_blog( $blog_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$home_url  = home_url( &#39;/&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$login_url = wp_login_url();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;restore_current_blog();<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$home_url  = &#39;http://&#39; . $domain . $path;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$login_url = &#39;http://&#39; . $domain . $path . &#39;wp&ndash;login.php&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$site = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;a href=&quot;%1$s&quot;&gt;%2$s&lt;/a&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;esc_url( $home_url ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blog_title<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site name */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;The site %s is yours.&#39; ), $site );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: link to new site, 2: login URL, 3: username */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;%1$s is your new site. &lt;a href=&quot;%2$s&quot;&gt;Log in&lt;/a&gt; as &amp;#8220;%3$s&amp;#8221; using your existing password.&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;a href=&quot;%s&quot;&gt;%s&lt;/a&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;esc_url( $home_url ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;untrailingslashit( $domain . $path )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;esc_url( $login_url ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_name<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires when the site or user sign&ndash;up process is complete.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;signup_finished&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Setup the new user signup process<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string          $user_name  The username.<br/>
+ * @param string          $user_email The user&#39;s email.<br/>
+ * @param WP_Error|string $errors     A WP_Error object containing existing errors. Defaults to empty string.<br/>
+ */<br/>
+function signup_user( $user_name = &#39;&#39;, $user_email = &#39;&#39;, $errors = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;global $active_signup;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$signup_for = isset( $_POST[&#39;signup_for&#39;] ) ? esc_html( $_POST[&#39;signup_for&#39;] ) : &#39;blog&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$signup_user_defaults = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;user_name&#39;  =&gt; $user_name,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;user_email&#39; =&gt; $user_email,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;errors&#39;     =&gt; $errors,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the default user variables used on the user sign&ndash;up form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $signup_user_defaults {<br/>
+&nbsp;&nbsp;&nbsp; *     An array of default user variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $user_name  The user username.<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $user_email The user email address.<br/>
+&nbsp;&nbsp;&nbsp; *     @type WP_Error $errors     A WP_Error object with possible errors relevant to the sign&ndash;up user.<br/>
+&nbsp;&nbsp;&nbsp; * }<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$filtered_results = apply_filters( &#39;signup_user_init&#39;, $signup_user_defaults );<br/>
+&nbsp;&nbsp;&nbsp;$user_name        = $filtered_results[&#39;user_name&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$user_email       = $filtered_results[&#39;user_email&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$errors           = $filtered_results[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: name of the network */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Get your own %s account in seconds&#39; ), get_network()&ndash;&gt;site_name );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form id=&quot;setupform&quot; method=&quot;post&quot; action=&quot;wp&ndash;signup.php&quot; novalidate=&quot;novalidate&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;stage&quot; value=&quot;validate&ndash;user&ndash;signup&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;signup.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;signup_hidden_fields&#39;, &#39;validate&ndash;user&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php show_user_form( $user_name, $user_email, $errors ); ?&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( &#39;blog&#39; === $active_signup ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;signupblog&quot; type=&quot;hidden&quot; name=&quot;signup_for&quot; value=&quot;blog&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } elseif ( &#39;user&#39; === $active_signup ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;signupblog&quot; type=&quot;hidden&quot; name=&quot;signup_for&quot; value=&quot;user&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } else { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;signupblog&quot; type=&quot;radio&quot; name=&quot;signup_for&quot; value=&quot;blog&quot; &lt;?php checked( $signup_for, &#39;blog&#39; ); ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label class=&quot;checkbox&quot; for=&quot;signupblog&quot;&gt;&lt;?php _e( &#39;Gimme a site!&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;br /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input id=&quot;signupuser&quot; type=&quot;radio&quot; name=&quot;signup_for&quot; value=&quot;user&quot; &lt;?php checked( $signup_for, &#39;user&#39; ); ?&gt; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;label class=&quot;checkbox&quot; for=&quot;signupuser&quot;&gt;&lt;?php _e( &#39;Just a username, please.&#39; ); ?&gt;&lt;/label&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php } ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;&lt;input type=&quot;submit&quot; name=&quot;submit&quot; class=&quot;submit&quot; value=&quot;&lt;?php esc_attr_e( &#39;Next&#39; ); ?&gt;&quot; /&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Validate the new user signup<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @return bool True if new user signup was validated, false if error<br/>
+ */<br/>
+function validate_user_signup() {<br/>
+&nbsp;&nbsp;&nbsp;$result     = validate_user_form();<br/>
+&nbsp;&nbsp;&nbsp;$user_name  = $result[&#39;user_name&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$user_email = $result[&#39;user_email&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$errors     = $result[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_user( $user_name, $user_email, $errors );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;blog&#39; == $_POST[&#39;signup_for&#39;] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_blog( $user_name, $user_email );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;signup.php */<br/>
+&nbsp;&nbsp;&nbsp;wpmu_signup_user( $user_name, $user_email, apply_filters( &#39;add_signup_meta&#39;, array() ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;confirm_user_signup( $user_name, $user_email );<br/>
+&nbsp;&nbsp;&nbsp;return true;<br/>
+}<br/>
+<br/>
+/**<br/>
+ * New user signup confirmation<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string $user_name The username<br/>
+ * @param string $user_email The user&#39;s email address<br/>
+ */<br/>
+function confirm_user_signup( $user_name, $user_email ) {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: username */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;%s is your new username&#39; ), $user_name )<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;But, before you can start using your new username, &lt;strong&gt;you must activate it&lt;/strong&gt;.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: email address */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Check your inbox at %s and click the link given.&#39; ), &#39;&lt;strong&gt;&#39; . $user_email . &#39;&lt;/strong&gt;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;If you do not activate your username within two days, you will have to sign up again.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;signup.php */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;signup_finished&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Setup the new site signup<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string          $user_name  The username.<br/>
+ * @param string          $user_email The user&#39;s email address.<br/>
+ * @param string          $blogname   The site name.<br/>
+ * @param string          $blog_title The site title.<br/>
+ * @param WP_Error|string $errors     A WP_Error object containing existing errors. Defaults to empty string.<br/>
+ */<br/>
+function signup_blog( $user_name = &#39;&#39;, $user_email = &#39;&#39;, $blogname = &#39;&#39;, $blog_title = &#39;&#39;, $errors = &#39;&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( ! is_wp_error( $errors ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$errors = new WP_Error();<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$signup_blog_defaults = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;user_name&#39;  =&gt; $user_name,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;user_email&#39; =&gt; $user_email,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;blogname&#39;   =&gt; $blogname,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;blog_title&#39; =&gt; $blog_title,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;errors&#39;     =&gt; $errors,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the default site creation variables for the site sign&ndash;up form.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $signup_blog_defaults {<br/>
+&nbsp;&nbsp;&nbsp; *     An array of default site creation variables.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $user_name  The user username.<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $user_email The user email address.<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $blogname   The blogname.<br/>
+&nbsp;&nbsp;&nbsp; *     @type string   $blog_title The title of the site.<br/>
+&nbsp;&nbsp;&nbsp; *     @type WP_Error $errors     A WP_Error object with possible errors relevant to new site creation variables.<br/>
+&nbsp;&nbsp;&nbsp; * }<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$filtered_results = apply_filters( &#39;signup_blog_init&#39;, $signup_blog_defaults );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$user_name  = $filtered_results[&#39;user_name&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$user_email = $filtered_results[&#39;user_email&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blogname   = $filtered_results[&#39;blogname&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blog_title = $filtered_results[&#39;blog_title&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$errors     = $filtered_results[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $blogname ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$blogname = $user_name;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form id=&quot;setupform&quot; method=&quot;post&quot; action=&quot;wp&ndash;signup.php&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;stage&quot; value=&quot;validate&ndash;blog&ndash;signup&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;user_name&quot; value=&quot;&lt;?php echo esc_attr( $user_name ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;user_email&quot; value=&quot;&lt;?php echo esc_attr( $user_email ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;signup.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;signup_hidden_fields&#39;, &#39;validate&ndash;site&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php show_blog_form( $blogname, $blog_title, $errors ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;p class=&quot;submit&quot;&gt;&lt;input type=&quot;submit&quot; name=&quot;submit&quot; class=&quot;submit&quot; value=&quot;&lt;?php esc_attr_e( &#39;Signup&#39; ); ?&gt;&quot; /&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Validate new site signup<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @return bool True if the site signup was validated, false if error<br/>
+ */<br/>
+function validate_blog_signup() {<br/>
+&nbsp;&nbsp;&nbsp;// Re&ndash;validate user info.<br/>
+&nbsp;&nbsp;&nbsp;$user_result = wpmu_validate_user_signup( $_POST[&#39;user_name&#39;], $_POST[&#39;user_email&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;$user_name   = $user_result[&#39;user_name&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$user_email  = $user_result[&#39;user_email&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$user_errors = $user_result[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $user_errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_user( $user_name, $user_email, $user_errors );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$result     = wpmu_validate_blog_signup( $_POST[&#39;blogname&#39;], $_POST[&#39;blog_title&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;$domain     = $result[&#39;domain&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$path       = $result[&#39;path&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blogname   = $result[&#39;blogname&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$blog_title = $result[&#39;blog_title&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$errors     = $result[&#39;errors&#39;];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $errors&ndash;&gt;has_errors() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_blog( $user_name, $user_email, $blogname, $blog_title, $errors );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$public      = (int) $_POST[&#39;blog_public&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$signup_meta = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;lang_id&#39; =&gt; 1,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;public&#39;  =&gt; $public,<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Handle the language setting for the new site.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $_POST[&#39;WPLANG&#39;] ) ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$languages = signup_get_available_languages();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( in_array( $_POST[&#39;WPLANG&#39;], $languages ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$language = wp_unslash( sanitize_text_field( $_POST[&#39;WPLANG&#39;] ) );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $language ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$signup_meta[&#39;WPLANG&#39;] = $language;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/** This filter is documented in wp&ndash;signup.php */<br/>
+&nbsp;&nbsp;&nbsp;$meta = apply_filters( &#39;add_signup_meta&#39;, $signup_meta );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wpmu_signup_blog( $domain, $path, $blog_title, $user_name, $user_email, $meta );<br/>
+&nbsp;&nbsp;&nbsp;confirm_blog_signup( $domain, $path, $blog_title, $user_name, $user_email, $meta );<br/>
+&nbsp;&nbsp;&nbsp;return true;<br/>
+}<br/>
+<br/>
+/**<br/>
+ * New site signup confirmation<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string $domain The domain URL<br/>
+ * @param string $path The site root path<br/>
+ * @param string $blog_title The new site title<br/>
+ * @param string $user_name The user&#39;s username<br/>
+ * @param string $user_email The user&#39;s email address<br/>
+ * @param array $meta Any additional meta from the {@see &#39;add_signup_meta&#39;} filter in validate_blog_signup()<br/>
+ */<br/>
+function confirm_blog_signup( $domain, $path, $blog_title, $user_name = &#39;&#39;, $user_email = &#39;&#39;, $meta = array() ) {<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: site address */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Congratulations! Your new site, %s, is almost ready.&#39; ), &quot;&lt;a href=&#39;http://{$domain}{$path}&#39;&gt;{$blog_title}&lt;/a&gt;&quot; )<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/h2&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;But, before you can start using your site, &lt;strong&gt;you must activate it&lt;/strong&gt;.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: email address */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;Check your inbox at %s and click the link given.&#39; ), &#39;&lt;strong&gt;&#39; . $user_email . &#39;&lt;/strong&gt;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;If you do not activate your site within two days, you will have to sign up again.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;h2&gt;&lt;?php _e( &#39;Still waiting for your email?&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php _e( &#39;If you haven&amp;#8217;t received your email yet, there are a number of things you can do:&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ul id=&quot;noemail&ndash;tips&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;li&gt;&lt;p&gt;&lt;strong&gt;&lt;?php _e( &#39;Wait a little longer. Sometimes delivery of email can be delayed by processes outside of our control.&#39; ); ?&gt;&lt;/strong&gt;&lt;/p&gt;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;li&gt;&lt;p&gt;&lt;?php _e( &#39;Check the junk or spam folder of your email client. Sometime emails wind up there by mistake.&#39; ); ?&gt;&lt;/p&gt;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: email address */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf( __( &#39;Have you entered your email correctly? You have entered %s, if it&amp;#8217;s incorrect, you will not receive your email.&#39; ), $user_email );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/li&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/ul&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/** This action is documented in wp&ndash;signup.php */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;signup_finished&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Retrieves languages available during the site/user signup process.<br/>
+ *<br/>
+ * @since 4.4.0<br/>
+ *<br/>
+ * @see get_available_languages()<br/>
+ *<br/>
+ * @return array List of available languages.<br/>
+ */<br/>
+function signup_get_available_languages() {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the list of available languages for front&ndash;end site signups.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Passing an empty array to this hook will disable output of the setting on the<br/>
+&nbsp;&nbsp;&nbsp; * signup form, and the default language will be used when creating the site.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Languages not already installed will be stripped.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.4.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param array $available_languages Available languages.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$languages = (array) apply_filters( &#39;signup_get_available_languages&#39;, get_available_languages() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp; * Strip any non&ndash;installed languages and return.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * Re&ndash;call get_available_languages() here in case a language pack was installed<br/>
+&nbsp;&nbsp;&nbsp; * in a callback hooked to the &#39;signup_get_available_languages&#39; filter before this point.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;return array_intersect_assoc( $languages, get_available_languages() );<br/>
+}<br/>
+<br/>
+// Main<br/>
+$active_signup = get_site_option( &#39;registration&#39;, &#39;none&#39; );<br/>
+<br/>
+/**<br/>
+ * Filters the type of site sign&ndash;up.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ *<br/>
+ * @param string $active_signup String that returns registration type. The value can be<br/>
+ *                              &#39;all&#39;, &#39;none&#39;, &#39;blog&#39;, or &#39;user&#39;.<br/>
+ */<br/>
+$active_signup = apply_filters( &#39;wpmu_active_signup&#39;, $active_signup );<br/>
+<br/>
+if ( current_user_can( &#39;manage_network&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;mu_alert&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;_e( &#39;Greetings Network Administrator!&#39; );<br/>
+&nbsp;&nbsp;&nbsp;echo &#39; &#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;switch ( $active_signup ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;none&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;The network currently disallows registrations.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;blog&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;The network currently allows site registrations.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;user&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;The network currently allows user registrations.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;The network currently allows both site and user registrations.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;echo &#39; &#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: network settings URL */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;To change or disable registration go to your &lt;a href=&quot;%s&quot;&gt;Options page&lt;/a&gt;.&#39; ), esc_url( network_admin_url( &#39;settings.php&#39; ) ) );<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;/div&gt;&#39;;<br/>
+}<br/>
+<br/>
+$newblogname = isset( $_GET[&#39;new&#39;] ) ? strtolower( preg_replace( &#39;/^&ndash;|&ndash;$|[^&ndash;a&ndash;zA&ndash;Z0&ndash;9]/&#39;, &#39;&#39;, $_GET[&#39;new&#39;] ) ) : null;<br/>
+<br/>
+$current_user = wp_get_current_user();<br/>
+if ( &#39;none&#39; === $active_signup ) {<br/>
+&nbsp;&nbsp;&nbsp;_e( &#39;Registration has been disabled.&#39; );<br/>
+} elseif ( &#39;blog&#39; === $active_signup &amp;&amp; ! is_user_logged_in() ) {<br/>
+&nbsp;&nbsp;&nbsp;$login_url = wp_login_url( network_site_url( &#39;wp&ndash;signup.php&#39; ) );<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: login URL */<br/>
+&nbsp;&nbsp;&nbsp;printf( __( &#39;You must first &lt;a href=&quot;%s&quot;&gt;log in&lt;/a&gt;, and then you can create a new site.&#39; ), $login_url );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$stage = isset( $_POST[&#39;stage&#39;] ) ? $_POST[&#39;stage&#39;] : &#39;default&#39;;<br/>
+&nbsp;&nbsp;&nbsp;switch ( $stage ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;validate&ndash;user&ndash;signup&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;all&#39; === $active_signup<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|| ( &#39;blog&#39; === $_POST[&#39;signup_for&#39;] &amp;&amp; &#39;blog&#39; === $active_signup )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|| ( &#39;user&#39; === $_POST[&#39;signup_for&#39;] &amp;&amp; &#39;user&#39; === $active_signup )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;validate_user_signup();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;User registration has been disabled.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;validate&ndash;blog&ndash;signup&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;all&#39; === $active_signup || &#39;blog&#39; === $active_signup ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;validate_blog_signup();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;Site registration has been disabled.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;gimmeanotherblog&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;validate_another_blog_signup();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;default&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$user_email = isset( $_POST[&#39;user_email&#39;] ) ? $_POST[&#39;user_email&#39;] : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires when the site sign&ndash;up form is sent.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.0.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;preprocess_signup_form&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( is_user_logged_in() &amp;&amp; ( &#39;all&#39; === $active_signup || &#39;blog&#39; === $active_signup ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_another_blog( $newblogname );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! is_user_logged_in() &amp;&amp; ( &#39;all&#39; === $active_signup || &#39;user&#39; === $active_signup ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signup_user( $newblogname, $user_email );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! is_user_logged_in() &amp;&amp; ( &#39;blog&#39; === $active_signup ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;Sorry, new registrations are not allowed at this time.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;You are logged in already. No need to register again!&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $newblogname ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$newblog = get_blogaddress_by_name( $newblogname );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;blog&#39; === $active_signup || &#39;all&#39; === $active_signup ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site address */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;em&gt;&#39; . __( &#39;The site you were looking for, %s, does not exist, but you can create it now!&#39; ) . &#39;&lt;/em&gt;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . $newblog . &#39;&lt;/strong&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: site address */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;em&gt;&#39; . __( &#39;The site you were looking for, %s, does not exist.&#39; ) . &#39;&lt;/em&gt;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;strong&gt;&#39; . $newblog . &#39;&lt;/strong&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;?php<br/>
+/**<br/>
+ * Fires after the sign&ndash;up forms, before wp_footer.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+do_action( &#39;after_signup_form&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;?php<br/>
+get_footer( &#39;wp&ndash;signup&#39; );</body></html>

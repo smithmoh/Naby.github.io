@@ -1,0 +1,289 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Displays Administration Menu.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * The current page.<br/>
+ *<br/>
+ * @global string $self<br/>
+ */<br/>
+$self = preg_replace( &#39;|^.*/wp&ndash;admin/network/|i&#39;, &#39;&#39;, $_SERVER[&#39;PHP_SELF&#39;] );<br/>
+$self = preg_replace( &#39;|^.*/wp&ndash;admin/|i&#39;, &#39;&#39;, $self );<br/>
+$self = preg_replace( &#39;|^.*/plugins/|i&#39;, &#39;&#39;, $self );<br/>
+$self = preg_replace( &#39;|^.*/mu&ndash;plugins/|i&#39;, &#39;&#39;, $self );<br/>
+<br/>
+/**<br/>
+ * For when admin&ndash;header is included from within a function.<br/>
+ *<br/>
+ * @global array  $menu<br/>
+ * @global array  $submenu<br/>
+ * @global string $parent_file<br/>
+ * @global string $submenu_file<br/>
+ */<br/>
+global $menu, $submenu, $parent_file, $submenu_file;<br/>
+<br/>
+/**<br/>
+ * Filters the parent file of an admin menu sub&ndash;menu item.<br/>
+ *<br/>
+ * Allows plugins to move sub&ndash;menu items around.<br/>
+ *<br/>
+ * @since MU (3.0.0)<br/>
+ *<br/>
+ * @param string $parent_file The parent file.<br/>
+ */<br/>
+$parent_file = apply_filters( &#39;parent_file&#39;, $parent_file );<br/>
+<br/>
+/**<br/>
+ * Filters the file of an admin menu sub&ndash;menu item.<br/>
+ *<br/>
+ * @since 4.4.0<br/>
+ *<br/>
+ * @param string $submenu_file The submenu file.<br/>
+ * @param string $parent_file  The submenu item&#39;s parent file.<br/>
+ */<br/>
+$submenu_file = apply_filters( &#39;submenu_file&#39;, $submenu_file, $parent_file );<br/>
+<br/>
+get_admin_page_parent();<br/>
+<br/>
+/**<br/>
+ * Display menu.<br/>
+ *<br/>
+ * @access private<br/>
+ * @since 2.7.0<br/>
+ *<br/>
+ * @global string $self<br/>
+ * @global string $parent_file<br/>
+ * @global string $submenu_file<br/>
+ * @global string $plugin_page<br/>
+ * @global string $typenow<br/>
+ *<br/>
+ * @param array $menu<br/>
+ * @param array $submenu<br/>
+ * @param bool  $submenu_as_parent<br/>
+ */<br/>
+function _wp_menu_output( $menu, $submenu, $submenu_as_parent = true ) {<br/>
+&nbsp;&nbsp;&nbsp;global $self, $parent_file, $submenu_file, $plugin_page, $typenow;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$first = true;<br/>
+&nbsp;&nbsp;&nbsp;// 0 = menu_title, 1 = capability, 2 = menu_slug, 3 = page_title, 4 = classes, 5 = hookname, 6 = icon_url<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $menu as $key =&gt; $item ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_is_parent = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class           = array();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_attributes = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_hidden     = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$is_separator    = false;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $first ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[] = &#39;wp&ndash;first&ndash;item&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$first   = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu_items = array();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $submenu[ $item[2] ] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[]       = &#39;wp&ndash;has&ndash;submenu&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu_items = $submenu[ $item[2] ];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $parent_file &amp;&amp; $item[2] == $parent_file ) || ( empty( $typenow ) &amp;&amp; $self == $item[2] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $submenu_items ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[] = &#39;wp&ndash;has&ndash;current&ndash;submenu wp&ndash;menu&ndash;open&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[]          = &#39;current&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_attributes .= &#39;aria&ndash;current=&quot;page&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[] = &#39;wp&ndash;not&ndash;current&ndash;submenu&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $submenu_items ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_attributes .= &#39;aria&ndash;haspopup=&quot;true&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $item[4] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[] = esc_attr( $item[4] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class     = $class ? &#39; class=&quot;&#39; . join( &#39; &#39;, $class ) . &#39;&quot;&#39; : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$id        = ! empty( $item[5] ) ? &#39; id=&quot;&#39; . preg_replace( &#39;|[^a&ndash;zA&ndash;Z0&ndash;9_:.]|&#39;, &#39;&ndash;&#39;, $item[5] ) . &#39;&quot;&#39; : &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img       = $img_style = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img_class = &#39; dashicons&ndash;before&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( false !== strpos( $class, &#39;wp&ndash;menu&ndash;separator&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$is_separator = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * If the string &#39;none&#39; (previously &#39;div&#39;) is passed instead of a URL, don&#39;t output<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * the default menu image so an icon can be added to div.wp&ndash;menu&ndash;image as background<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * with CSS. Dashicons and base64&ndash;encoded data:image/svg_xml URIs are also handled<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * as special cases.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $item[6] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img = &#39;&lt;img src=&quot;&#39; . $item[6] . &#39;&quot; alt=&quot;&quot; /&gt;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( &#39;none&#39; === $item[6] || &#39;div&#39; === $item[6] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img = &#39;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( 0 === strpos( $item[6], &#39;data:image/svg+xml;base64,&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img       = &#39;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img_style = &#39; style=&quot;background&ndash;image:url(\&#39;&#39; . esc_attr( $item[6] ) . &#39;\&#39;)&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img_class = &#39; svg&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( 0 === strpos( $item[6], &#39;dashicons&ndash;&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img       = &#39;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$img_class = &#39; dashicons&ndash;before &#39; . sanitize_html_class( $item[6] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$arrow = &#39;&lt;div class=&quot;wp&ndash;menu&ndash;arrow&quot;&gt;&lt;div&gt;&lt;/div&gt;&lt;/div&gt;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = wptexturize( $item[0] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Hide separators from screen readers.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $is_separator ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_hidden = &#39; aria&ndash;hidden=&quot;true&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;\n\t&lt;li$class$id$aria_hidden&gt;&quot;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $is_separator ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div class=&quot;separator&quot;&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( $submenu_as_parent &amp;&amp; ! empty( $submenu_items ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$submenu_items = array_values( $submenu_items );  // Re&ndash;index.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_hook     = get_plugin_page_hook( $submenu_items[0][2], $item[2] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_file     = $submenu_items[0][2];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( false !== ( $pos = strpos( $menu_file, &#39;?&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_file = substr( $menu_file, 0, $pos );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $menu_hook ) || ( ( &#39;index.php&#39; != $submenu_items[0][2] ) &amp;&amp; file_exists( WP_PLUGIN_DIR . &quot;/$menu_file&quot; ) &amp;&amp; ! file_exists( ABSPATH . &quot;/wp&ndash;admin/$menu_file&quot; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_is_parent = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;a href=&#39;admin.php?page={$submenu_items[0][2]}&#39;$class $aria_attributes&gt;$arrow&lt;div class=&#39;wp&ndash;menu&ndash;image$img_class&#39;$img_style&gt;$img&lt;/div&gt;&lt;div class=&#39;wp&ndash;menu&ndash;name&#39;&gt;$title&lt;/div&gt;&lt;/a&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;\n\t&lt;a href=&#39;{$submenu_items[0][2]}&#39;$class $aria_attributes&gt;$arrow&lt;div class=&#39;wp&ndash;menu&ndash;image$img_class&#39;$img_style&gt;$img&lt;/div&gt;&lt;div class=&#39;wp&ndash;menu&ndash;name&#39;&gt;$title&lt;/div&gt;&lt;/a&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif ( ! empty( $item[2] ) &amp;&amp; current_user_can( $item[1] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_hook = get_plugin_page_hook( $item[2], &#39;admin.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_file = $item[2];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( false !== ( $pos = strpos( $menu_file, &#39;?&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_file = substr( $menu_file, 0, $pos );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $menu_hook ) || ( ( &#39;index.php&#39; != $item[2] ) &amp;&amp; file_exists( WP_PLUGIN_DIR . &quot;/$menu_file&quot; ) &amp;&amp; ! file_exists( ABSPATH . &quot;/wp&ndash;admin/$menu_file&quot; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_is_parent = true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;\n\t&lt;a href=&#39;admin.php?page={$item[2]}&#39;$class $aria_attributes&gt;$arrow&lt;div class=&#39;wp&ndash;menu&ndash;image$img_class&#39;$img_style&gt;$img&lt;/div&gt;&lt;div class=&#39;wp&ndash;menu&ndash;name&#39;&gt;{$item[0]}&lt;/div&gt;&lt;/a&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;\n\t&lt;a href=&#39;{$item[2]}&#39;$class $aria_attributes&gt;$arrow&lt;div class=&#39;wp&ndash;menu&ndash;image$img_class&#39;$img_style&gt;$img&lt;/div&gt;&lt;div class=&#39;wp&ndash;menu&ndash;name&#39;&gt;{$item[0]}&lt;/div&gt;&lt;/a&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $submenu_items ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;\n\t&lt;ul class=&#39;wp&ndash;submenu wp&ndash;submenu&ndash;wrap&#39;&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;li class=&#39;wp&ndash;submenu&ndash;head&#39; aria&ndash;hidden=&#39;true&#39;&gt;{$item[0]}&lt;/li&gt;&quot;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$first = true;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 0 = menu_title, 1 = capability, 2 = menu_slug, 3 = page_title, 4 = classes<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $submenu_items as $sub_key =&gt; $sub_item ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( $sub_item[1] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class           = array();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_attributes = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $first ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[] = &#39;wp&ndash;first&ndash;item&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$first   = false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_file = $item[2];<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( false !== ( $pos = strpos( $menu_file, &#39;?&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_file = substr( $menu_file, 0, $pos );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Handle current for post_type=post|page|foo pages, which won&#39;t match $self.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$self_type = ! empty( $typenow ) ? $self . &#39;?post_type=&#39; . $typenow : &#39;nothing&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( isset( $submenu_file ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $submenu_file == $sub_item[2] ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[]          = &#39;current&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_attributes .= &#39; aria&ndash;current=&quot;page&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If plugin_page is set the parent must either match the current page or not physically exist.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// This allows plugin pages with the same hook to exist under different parents.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} elseif (<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( ! isset( $plugin_page ) &amp;&amp; $self == $sub_item[2] ) ||<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;( isset( $plugin_page ) &amp;&amp; $plugin_page == $sub_item[2] &amp;&amp; ( $item[2] == $self_type || $item[2] == $self || file_exists( $menu_file ) === false ) )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[]          = &#39;current&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$aria_attributes .= &#39; aria&ndash;current=&quot;page&quot;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $sub_item[4] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class[] = esc_attr( $sub_item[4] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class = $class ? &#39; class=&quot;&#39; . join( &#39; &#39;, $class ) . &#39;&quot;&#39; : &#39;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$menu_hook = get_plugin_page_hook( $sub_item[2], $item[2] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sub_file  = $sub_item[2];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( false !== ( $pos = strpos( $sub_file, &#39;?&#39; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sub_file = substr( $sub_file, 0, $pos );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = wptexturize( $sub_item[0] );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! empty( $menu_hook ) || ( ( &#39;index.php&#39; != $sub_item[2] ) &amp;&amp; file_exists( WP_PLUGIN_DIR . &quot;/$sub_file&quot; ) &amp;&amp; ! file_exists( ABSPATH . &quot;/wp&ndash;admin/$sub_file&quot; ) ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// If admin.php is the current page or if the parent exists as a file in the plugins or admin dir<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( ! $admin_is_parent &amp;&amp; file_exists( WP_PLUGIN_DIR . &quot;/$menu_file&quot; ) &amp;&amp; ! is_dir( WP_PLUGIN_DIR . &quot;/{$item[2]}&quot; ) ) || file_exists( $menu_file ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sub_item_url = add_query_arg( array( &#39;page&#39; =&gt; $sub_item[2] ), $item[2] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sub_item_url = add_query_arg( array( &#39;page&#39; =&gt; $sub_item[2] ), &#39;admin.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$sub_item_url = esc_url( $sub_item_url );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;li$class&gt;&lt;a href=&#39;$sub_item_url&#39;$class$aria_attributes&gt;$title&lt;/a&gt;&lt;/li&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &quot;&lt;li$class&gt;&lt;a href=&#39;{$sub_item[2]}&#39;$class$aria_attributes&gt;$title&lt;/a&gt;&lt;/li&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/ul&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;/li&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;li id=&quot;collapse&ndash;menu&quot; class=&quot;hide&ndash;if&ndash;no&ndash;js&quot;&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;button type=&quot;button&quot; id=&quot;collapse&ndash;button&quot; aria&ndash;label=&quot;&#39; . esc_attr__( &#39;Collapse Main menu&#39; ) . &#39;&quot; aria&ndash;expanded=&quot;true&quot;&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;span class=&quot;collapse&ndash;button&ndash;icon&quot; aria&ndash;hidden=&quot;true&quot;&gt;&lt;/span&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;span class=&quot;collapse&ndash;button&ndash;label&quot;&gt;&#39; . __( &#39;Collapse menu&#39; ) . &#39;&lt;/span&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;/button&gt;&lt;/li&gt;&#39;;<br/>
+}<br/>
+<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;adminmenumain&quot; role=&quot;navigation&quot; aria&ndash;label=&quot;&lt;?php esc_attr_e( &#39;Main menu&#39; ); ?&gt;&quot;&gt;<br/>
+&lt;a href=&quot;#wpbody&ndash;content&quot; class=&quot;screen&ndash;reader&ndash;shortcut&quot;&gt;&lt;?php _e( &#39;Skip to main content&#39; ); ?&gt;&lt;/a&gt;<br/>
+&lt;a href=&quot;#wp&ndash;toolbar&quot; class=&quot;screen&ndash;reader&ndash;shortcut&quot;&gt;&lt;?php _e( &#39;Skip to toolbar&#39; ); ?&gt;&lt;/a&gt;<br/>
+&lt;div id=&quot;adminmenuback&quot;&gt;&lt;/div&gt;<br/>
+&lt;div id=&quot;adminmenuwrap&quot;&gt;<br/>
+&lt;ul id=&quot;adminmenu&quot;&gt;<br/>
+<br/>
+&lt;?php<br/>
+<br/>
+_wp_menu_output( $menu, $submenu );<br/>
+/**<br/>
+ * Fires after the admin menu has been output.<br/>
+ *<br/>
+ * @since 2.5.0<br/>
+ */<br/>
+do_action( &#39;adminmenu&#39; );<br/>
+<br/>
+?&gt;<br/>
+&lt;/ul&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;</body></html>

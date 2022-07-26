@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Edit links form for inclusion in administration panels.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+// don&#39;t load directly<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die( &#39;&ndash;1&#39; );<br/>
+}<br/>
+<br/>
+if ( ! empty( $link_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$heading      = sprintf( __( &#39;&lt;a href=&quot;%s&quot;&gt;Links&lt;/a&gt; / Edit Link&#39; ), &#39;link&ndash;manager.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submit_text  = __( &#39;Update Link&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$form_name    = &#39;editlink&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$nonce_action = &#39;update&ndash;bookmark_&#39; . $link_id;<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$heading      = sprintf( __( &#39;&lt;a href=&quot;%s&quot;&gt;Links&lt;/a&gt; / Add New Link&#39; ), &#39;link&ndash;manager.php&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$submit_text  = __( &#39;Add Link&#39; );<br/>
+&nbsp;&nbsp;&nbsp;$form_name    = &#39;addlink&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$nonce_action = &#39;add&ndash;bookmark&#39;;<br/>
+}<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/meta&ndash;boxes.php&#39; );<br/>
+<br/>
+add_meta_box( &#39;linksubmitdiv&#39;, __( &#39;Save&#39; ), &#39;link_submit_meta_box&#39;, null, &#39;side&#39;, &#39;core&#39; );<br/>
+add_meta_box( &#39;linkcategorydiv&#39;, __( &#39;Categories&#39; ), &#39;link_categories_meta_box&#39;, null, &#39;normal&#39;, &#39;core&#39; );<br/>
+add_meta_box( &#39;linktargetdiv&#39;, __( &#39;Target&#39; ), &#39;link_target_meta_box&#39;, null, &#39;normal&#39;, &#39;core&#39; );<br/>
+add_meta_box( &#39;linkxfndiv&#39;, __( &#39;Link Relationship (XFN)&#39; ), &#39;link_xfn_meta_box&#39;, null, &#39;normal&#39;, &#39;core&#39; );<br/>
+add_meta_box( &#39;linkadvanceddiv&#39;, __( &#39;Advanced&#39; ), &#39;link_advanced_meta_box&#39;, null, &#39;normal&#39;, &#39;core&#39; );<br/>
+<br/>
+/** This action is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+do_action( &#39;add_meta_boxes&#39;, &#39;link&#39;, $link );<br/>
+<br/>
+/**<br/>
+ * Fires when link&ndash;specific meta boxes are added.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ *<br/>
+ * @param object $link Link object.<br/>
+ */<br/>
+do_action( &#39;add_meta_boxes_link&#39;, $link );<br/>
+<br/>
+/** This action is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+do_action( &#39;do_meta_boxes&#39;, &#39;link&#39;, &#39;normal&#39;, $link );<br/>
+/** This action is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+do_action( &#39;do_meta_boxes&#39;, &#39;link&#39;, &#39;advanced&#39;, $link );<br/>
+/** This action is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+do_action( &#39;do_meta_boxes&#39;, &#39;link&#39;, &#39;side&#39;, $link );<br/>
+<br/>
+add_screen_option(<br/>
+&nbsp;&nbsp;&nbsp;&#39;layout_columns&#39;,<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;max&#39;     =&gt; 2,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;default&#39; =&gt; 2,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;You can add or edit links on this screen by entering information in each of the boxes. Only the link&amp;#8217;s web address and name (the text you want to display on your site as the link) are required fields.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;The boxes for link name, web address, and description have fixed positions, while the others may be repositioned using drag and drop. You can also hide boxes you don&amp;#8217;t use in the Screen Options tab, or minimize boxes by clicking on the title bar of the box.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;XFN stands for &lt;a href=&quot;http://gmpg.org/xfn/&quot;&gt;XHTML Friends Network&lt;/a&gt;, which is optional. WordPress allows the generation of XFN attributes to show how you are related to the authors/owners of the site to which you are linking.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Links_Add_New_Screen&quot;&gt;Documentation on Creating Links&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+);<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1 class=&quot;wp&ndash;heading&ndash;inline&quot;&gt;<br/>
+&lt;?php<br/>
+echo esc_html( $title );<br/>
+?&gt;<br/>
+&lt;/h1&gt;<br/>
+<br/>
+&lt;a href=&quot;link&ndash;add.php&quot; class=&quot;page&ndash;title&ndash;action&quot;&gt;&lt;?php echo esc_html_x( &#39;Add New&#39;, &#39;link&#39; ); ?&gt;&lt;/a&gt;<br/>
+<br/>
+&lt;hr class=&quot;wp&ndash;header&ndash;end&quot;&gt;<br/>
+<br/>
+&lt;?php if ( isset( $_GET[&#39;added&#39;] ) ) : ?&gt;<br/>
+&lt;div id=&quot;message&quot; class=&quot;updated notice is&ndash;dismissible&quot;&gt;&lt;p&gt;&lt;?php _e( &#39;Link added.&#39; ); ?&gt;&lt;/p&gt;&lt;/div&gt;<br/>
+&lt;?php endif; ?&gt;<br/>
+<br/>
+&lt;form name=&quot;&lt;?php echo esc_attr( $form_name ); ?&gt;&quot; id=&quot;&lt;?php echo esc_attr( $form_name ); ?&gt;&quot; method=&quot;post&quot; action=&quot;link.php&quot;&gt;<br/>
+&lt;?php<br/>
+if ( ! empty( $link_added ) ) {<br/>
+&nbsp;&nbsp;&nbsp;echo $link_added;<br/>
+}<br/>
+<br/>
+wp_nonce_field( $nonce_action );<br/>
+wp_nonce_field( &#39;closedpostboxes&#39;, &#39;closedpostboxesnonce&#39;, false );<br/>
+wp_nonce_field( &#39;meta&ndash;box&ndash;order&#39;, &#39;meta&ndash;box&ndash;order&ndash;nonce&#39;, false );<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;poststuff&quot;&gt;<br/>
+<br/>
+&lt;div id=&quot;post&ndash;body&quot; class=&quot;metabox&ndash;holder columns&ndash;&lt;?php echo 1 == get_current_screen()&ndash;&gt;get_columns() ? &#39;1&#39; : &#39;2&#39;; ?&gt;&quot;&gt;<br/>
+&lt;div id=&quot;post&ndash;body&ndash;content&quot;&gt;<br/>
+&lt;div id=&quot;namediv&quot; class=&quot;stuffbox&quot;&gt;<br/>
+&lt;h2&gt;&lt;label for=&quot;link_name&quot;&gt;&lt;?php _ex( &#39;Name&#39;, &#39;link name&#39; ); ?&gt;&lt;/label&gt;&lt;/h2&gt;<br/>
+&lt;div class=&quot;inside&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;link_name&quot; size=&quot;30&quot; maxlength=&quot;255&quot; value=&quot;&lt;?php echo esc_attr( $link&ndash;&gt;link_name ); ?&gt;&quot; id=&quot;link_name&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Example: Nifty blogging software&#39; ); ?&gt;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;div id=&quot;addressdiv&quot; class=&quot;stuffbox&quot;&gt;<br/>
+&lt;h2&gt;&lt;label for=&quot;link_url&quot;&gt;&lt;?php _e( &#39;Web Address&#39; ); ?&gt;&lt;/label&gt;&lt;/h2&gt;<br/>
+&lt;div class=&quot;inside&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;link_url&quot; size=&quot;30&quot; maxlength=&quot;255&quot; class=&quot;code&quot; value=&quot;&lt;?php echo esc_attr( $link&ndash;&gt;link_url ); ?&gt;&quot; id=&quot;link_url&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;Example: &lt;code&gt;http://wordpress.org/&lt;/code&gt; &amp;#8212; don&amp;#8217;t forget the &lt;code&gt;http://&lt;/code&gt;&#39; ); ?&gt;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;div id=&quot;descriptiondiv&quot; class=&quot;stuffbox&quot;&gt;<br/>
+&lt;h2&gt;&lt;label for=&quot;link_description&quot;&gt;&lt;?php _e( &#39;Description&#39; ); ?&gt;&lt;/label&gt;&lt;/h2&gt;<br/>
+&lt;div class=&quot;inside&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;link_description&quot; size=&quot;30&quot; maxlength=&quot;255&quot; value=&quot;&lt;?php echo isset( $link&ndash;&gt;link_description ) ? esc_attr( $link&ndash;&gt;link_description ) : &#39;&#39;; ?&gt;&quot; id=&quot;link_description&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;p&gt;&lt;?php _e( &#39;This will be shown when someone hovers over the link in the blogroll, or optionally below the link.&#39; ); ?&gt;&lt;/p&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;&lt;!&ndash;&ndash; /post&ndash;body&ndash;content &ndash;&ndash;&gt;<br/>
+<br/>
+&lt;div id=&quot;postbox&ndash;container&ndash;1&quot; class=&quot;postbox&ndash;container&quot;&gt;<br/>
+&lt;?php<br/>
+<br/>
+/** This action is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+do_action( &#39;submitlink_box&#39; );<br/>
+$side_meta_boxes = do_meta_boxes( &#39;link&#39;, &#39;side&#39;, $link );<br/>
+<br/>
+?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;div id=&quot;postbox&ndash;container&ndash;2&quot; class=&quot;postbox&ndash;container&quot;&gt;<br/>
+&lt;?php<br/>
+<br/>
+do_meta_boxes( null, &#39;normal&#39;, $link );<br/>
+<br/>
+do_meta_boxes( null, &#39;advanced&#39;, $link );<br/>
+<br/>
+?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;?php<br/>
+<br/>
+if ( $link_id ) :<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;save&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;link_id&quot; value=&quot;&lt;?php echo (int) $link_id; ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;cat_id&quot; value=&quot;&lt;?php echo (int) $cat_id; ?&gt;&quot; /&gt;<br/>
+&lt;?php else : ?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;add&quot; /&gt;<br/>
+&lt;?php endif; ?&gt;<br/>
+<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;/form&gt;<br/>
+&lt;/div&gt;</body></html>

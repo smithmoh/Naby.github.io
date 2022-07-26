@@ -1,0 +1,275 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Theme Customize Screen.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Customize<br/>
+ * @since 3.4.0<br/>
+ */<br/>
+<br/>
+define( &#39;IFRAME_REQUEST&#39;, true );<br/>
+<br/>
+/** Load WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! current_user_can( &#39;customize&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;You need a higher level of permission.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Sorry, you are not allowed to customize this site.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+/**<br/>
+ * @global WP_Scripts           $wp_scripts<br/>
+ * @global WP_Customize_Manager $wp_customize<br/>
+ */<br/>
+global $wp_scripts, $wp_customize;<br/>
+<br/>
+if ( $wp_customize&ndash;&gt;changeset_post_id() ) {<br/>
+&nbsp;&nbsp;&nbsp;$changeset_post = get_post( $wp_customize&ndash;&gt;changeset_post_id() );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! current_user_can( get_post_type_object( &#39;customize_changeset&#39; )&ndash;&gt;cap&ndash;&gt;edit_post, $changeset_post&ndash;&gt;ID ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;You need a higher level of permission.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Sorry, you are not allowed to edit this changeset.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$missed_schedule = (<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;future&#39; === $changeset_post&ndash;&gt;post_status &amp;&amp;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_post_time( &#39;G&#39;, true, $changeset_post ) &lt; time()<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;if ( $missed_schedule ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Note that an Ajax request spawns here instead of just calling `wp_publish_post( $changeset_post&ndash;&gt;ID )`.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Because WP_Customize_Manager is not instantiated for customize.php with the `settings_previewed=false`<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * argument, settings cannot be reliably saved. Some logic short&ndash;circuits if the current value is the<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * same as the value being saved. This is particularly true for options via `update_option()`.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * By opening an Ajax request, this is avoided and the changeset is published. See #39221.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$nonces       = $wp_customize&ndash;&gt;get_nonces();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$request_args = array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;nonce&#39;                      =&gt; $nonces[&#39;save&#39;],<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;customize_changeset_uuid&#39;   =&gt; $wp_customize&ndash;&gt;changeset_uuid(),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;wp_customize&#39;               =&gt; &#39;on&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;customize_changeset_status&#39; =&gt; &#39;publish&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ob_start();<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php wp_print_scripts( array( &#39;wp&ndash;util&#39; ) ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp.ajax.post( &#39;customize_save&#39;, &lt;?php echo wp_json_encode( $request_args ); ?&gt; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$script = ob_get_clean();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Your scheduled changes just published&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;a href=&quot;&#39; . esc_url( remove_query_arg( &#39;changeset_uuid&#39; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Customize New Changes&#39; ) . &#39;&lt;/a&gt;&lt;/p&gt;&#39; . $script,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;200<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( in_array( get_post_status( $changeset_post&ndash;&gt;ID ), array( &#39;publish&#39;, &#39;trash&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Something went wrong.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;This changeset cannot be further modified.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;a href=&quot;&#39; . esc_url( remove_query_arg( &#39;changeset_uuid&#39; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Customize New Changes&#39; ) . &#39;&lt;/a&gt;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+<br/>
+wp_reset_vars( array( &#39;url&#39;, &#39;return&#39;, &#39;autofocus&#39; ) );<br/>
+if ( ! empty( $url ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$wp_customize&ndash;&gt;set_preview_url( wp_unslash( $url ) );<br/>
+}<br/>
+if ( ! empty( $return ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$wp_customize&ndash;&gt;set_return_url( wp_unslash( $return ) );<br/>
+}<br/>
+if ( ! empty( $autofocus ) &amp;&amp; is_array( $autofocus ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$wp_customize&ndash;&gt;set_autofocus( wp_unslash( $autofocus ) );<br/>
+}<br/>
+<br/>
+$registered             = $wp_scripts&ndash;&gt;registered;<br/>
+$wp_scripts             = new WP_Scripts;<br/>
+$wp_scripts&ndash;&gt;registered = $registered;<br/>
+<br/>
+add_action( &#39;customize_controls_print_scripts&#39;, &#39;print_head_scripts&#39;, 20 );<br/>
+add_action( &#39;customize_controls_print_footer_scripts&#39;, &#39;_wp_footer_scripts&#39; );<br/>
+add_action( &#39;customize_controls_print_styles&#39;, &#39;print_admin_styles&#39;, 20 );<br/>
+<br/>
+/**<br/>
+ * Fires when Customizer controls are initialized, before scripts are enqueued.<br/>
+ *<br/>
+ * @since 3.4.0<br/>
+ */<br/>
+do_action( &#39;customize_controls_init&#39; );<br/>
+<br/>
+wp_enqueue_script( &#39;heartbeat&#39; );<br/>
+wp_enqueue_script( &#39;customize&ndash;controls&#39; );<br/>
+wp_enqueue_style( &#39;customize&ndash;controls&#39; );<br/>
+<br/>
+/**<br/>
+ * Enqueue Customizer control scripts.<br/>
+ *<br/>
+ * @since 3.4.0<br/>
+ */<br/>
+do_action( &#39;customize_controls_enqueue_scripts&#39; );<br/>
+<br/>
+// Let&#39;s roll.<br/>
+@header( &#39;Content&ndash;Type: &#39; . get_option( &#39;html_type&#39; ) . &#39;; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+<br/>
+wp_user_settings();<br/>
+_wp_admin_html_begin();<br/>
+<br/>
+$body_class = &#39;wp&ndash;core&ndash;ui wp&ndash;customizer js&#39;;<br/>
+<br/>
+if ( wp_is_mobile() ) :<br/>
+&nbsp;&nbsp;&nbsp;$body_class .= &#39; mobile&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;meta name=&quot;viewport&quot; id=&quot;viewport&ndash;meta&quot; content=&quot;width=device&ndash;width, initial&ndash;scale=1.0, minimum&ndash;scale=0.5, maximum&ndash;scale=1.2&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+endif;<br/>
+<br/>
+if ( $wp_customize&ndash;&gt;is_ios() ) {<br/>
+&nbsp;&nbsp;&nbsp;$body_class .= &#39; ios&#39;;<br/>
+}<br/>
+<br/>
+if ( is_rtl() ) {<br/>
+&nbsp;&nbsp;&nbsp;$body_class .= &#39; rtl&#39;;<br/>
+}<br/>
+$body_class .= &#39; locale&ndash;&#39; . sanitize_html_class( strtolower( str_replace( &#39;_&#39;, &#39;&ndash;&#39;, get_user_locale() ) ) );<br/>
+<br/>
+$admin_title = sprintf( $wp_customize&ndash;&gt;get_document_title_template(), __( &#39;Loading&amp;hellip;&#39; ) );<br/>
+<br/>
+?&gt;<br/>
+&lt;title&gt;&lt;?php echo $admin_title; ?&gt;&lt;/title&gt;<br/>
+<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+var ajaxurl = &lt;?php echo wp_json_encode( admin_url( &#39;admin&ndash;ajax.php&#39;, &#39;relative&#39; ) ); ?&gt;,<br/>
+&nbsp;&nbsp;&nbsp;pagenow = &#39;customize&#39;;<br/>
+&lt;/script&gt;<br/>
+<br/>
+&lt;?php<br/>
+/**<br/>
+ * Fires when Customizer control styles are printed.<br/>
+ *<br/>
+ * @since 3.4.0<br/>
+ */<br/>
+do_action( &#39;customize_controls_print_styles&#39; );<br/>
+<br/>
+/**<br/>
+ * Fires when Customizer control scripts are printed.<br/>
+ *<br/>
+ * @since 3.4.0<br/>
+ */<br/>
+do_action( &#39;customize_controls_print_scripts&#39; );<br/>
+?&gt;<br/>
+&lt;/head&gt;<br/>
+&lt;body class=&quot;&lt;?php echo esc_attr( $body_class ); ?&gt;&quot;&gt;<br/>
+&lt;div class=&quot;wp&ndash;full&ndash;overlay expanded&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;form id=&quot;customize&ndash;controls&quot; class=&quot;wrap wp&ndash;full&ndash;overlay&ndash;sidebar&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;header&ndash;actions&quot; class=&quot;wp&ndash;full&ndash;overlay&ndash;header&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php $save_text = $wp_customize&ndash;&gt;is_theme_active() ? __( &#39;Publish&#39; ) : __( &#39;Activate &amp;amp; Publish&#39; ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;save&ndash;button&ndash;wrapper&quot; class=&quot;customize&ndash;save&ndash;button&ndash;wrapper&quot; &gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php submit_button( $save_text, &#39;primary save&#39;, &#39;save&#39;, false ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button id=&quot;publish&ndash;settings&quot; class=&quot;publish&ndash;settings button&ndash;primary button dashicons dashicons&ndash;admin&ndash;generic&quot; aria&ndash;label=&quot;&lt;?php esc_attr_e( &#39;Publish Settings&#39; ); ?&gt;&quot; aria&ndash;expanded=&quot;false&quot; disabled&gt;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;spinner&quot;&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;customize&ndash;controls&ndash;preview&ndash;toggle&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;controls&quot;&gt;&lt;?php _e( &#39;Customize&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;preview&quot;&gt;&lt;?php _e( &#39;Preview&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;a class=&quot;customize&ndash;controls&ndash;close&quot; href=&quot;&lt;?php echo esc_url( $wp_customize&ndash;&gt;get_return_url() ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Close the Customizer and go back to the previous page&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;sidebar&ndash;outer&ndash;content&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;outer&ndash;theme&ndash;controls&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ul class=&quot;customize&ndash;outer&ndash;pane&ndash;parent&quot;&gt;&lt;?php // Outer panel and sections are not implemented, but its here as a placeholder to avoid any side&ndash;effect in api.Section. ?&gt;&lt;/ul&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;widgets&ndash;right&quot; class=&quot;wp&ndash;clearfix&quot;&gt;&lt;!&ndash;&ndash; For Widget Customizer, many widgets try to look for instances under div#widgets&ndash;right, so we have to add that ID to a container div in the Customizer for compat &ndash;&ndash;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;notifications&ndash;area&quot; class=&quot;customize&ndash;control&ndash;notifications&ndash;container&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ul&gt;&lt;/ul&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;wp&ndash;full&ndash;overlay&ndash;sidebar&ndash;content&quot; tabindex=&quot;&ndash;1&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;info&quot; class=&quot;accordion&ndash;section customize&ndash;info&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;accordion&ndash;section&ndash;title&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;preview&ndash;notice&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo sprintf( __( &#39;You are customizing %s&#39; ), &#39;&lt;strong class=&quot;panel&ndash;title site&ndash;title&quot;&gt;&#39; . get_bloginfo( &#39;name&#39;, &#39;display&#39; ) . &#39;&lt;/strong&gt;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;customize&ndash;help&ndash;toggle dashicons dashicons&ndash;editor&ndash;help&quot; aria&ndash;expanded=&quot;false&quot;&gt;&lt;span class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Help&#39; ); ?&gt;&lt;/span&gt;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;customize&ndash;panel&ndash;description&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_e( &#39;The Customizer allows you to preview changes to your site before publishing them. You can navigate to different pages on your site within the preview. Edit shortcuts are shown for some editable elements.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;theme&ndash;controls&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ul class=&quot;customize&ndash;pane&ndash;parent&quot;&gt;&lt;?php // Panels and sections are managed here via JavaScript ?&gt;&lt;/ul&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;footer&ndash;actions&quot; class=&quot;wp&ndash;full&ndash;overlay&ndash;footer&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;collapse&ndash;sidebar button&quot; aria&ndash;expanded=&quot;true&quot; aria&ndash;label=&quot;&lt;?php echo esc_attr( _x( &#39;Hide Controls&#39;, &#39;label for hide controls button without length constraints&#39; ) ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;collapse&ndash;sidebar&ndash;arrow&quot;&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;collapse&ndash;sidebar&ndash;label&quot;&gt;&lt;?php _ex( &#39;Hide Controls&#39;, &#39;short (~12 characters) label for hide controls button&#39; ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php $previewable_devices = $wp_customize&ndash;&gt;get_previewable_devices(); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php if ( ! empty( $previewable_devices ) ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;devices&ndash;wrapper&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div class=&quot;devices&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php foreach ( (array) $previewable_devices as $device =&gt; $settings ) : ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( empty( $settings[&#39;label&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$active = ! empty( $settings[&#39;default&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class  = &#39;preview&ndash;&#39; . $device;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $active ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$class .= &#39; active&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;button type=&quot;button&quot; class=&quot;&lt;?php echo esc_attr( $class ); ?&gt;&quot; aria&ndash;pressed=&quot;&lt;?php echo esc_attr( $active ); ?&gt;&quot; data&ndash;device=&quot;&lt;?php echo esc_attr( $device ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php echo esc_html( $settings[&#39;label&#39;] ); ?&gt;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/button&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endforeach; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php endif; ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/form&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;customize&ndash;preview&quot; class=&quot;wp&ndash;full&ndash;overlay&ndash;main&quot;&gt;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Prints templates, control scripts, and settings in the footer.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.4.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;customize_controls_print_footer_scripts&#39; );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/body&gt;<br/>
+&lt;/html&gt;</body></html>

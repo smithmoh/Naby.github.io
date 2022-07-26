@@ -1,0 +1,299 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Administration Template Header<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+@header( &#39;Content&ndash;Type: &#39; . get_option( &#39;html_type&#39; ) . &#39;; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+if ( ! defined( &#39;WP_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * In case admin&ndash;header.php is included in a function.<br/>
+ *<br/>
+ * @global string    $title<br/>
+ * @global string    $hook_suffix<br/>
+ * @global WP_Screen $current_screen<br/>
+ * @global WP_Locale $wp_locale<br/>
+ * @global string    $pagenow<br/>
+ * @global string    $update_title<br/>
+ * @global int       $total_update_count<br/>
+ * @global string    $parent_file<br/>
+ */<br/>
+global $title, $hook_suffix, $current_screen, $wp_locale, $pagenow,<br/>
+&nbsp;&nbsp;&nbsp;$update_title, $total_update_count, $parent_file;<br/>
+<br/>
+// Catch plugins that include admin&ndash;header.php before admin.php completes.<br/>
+if ( empty( $current_screen ) ) {<br/>
+&nbsp;&nbsp;&nbsp;set_current_screen();<br/>
+}<br/>
+<br/>
+get_admin_page_title();<br/>
+$title = esc_html( strip_tags( $title ) );<br/>
+<br/>
+if ( is_network_admin() ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: Network admin screen title. %s: Network name */<br/>
+&nbsp;&nbsp;&nbsp;$admin_title = sprintf( __( &#39;Network Admin: %s&#39; ), esc_html( get_network()&ndash;&gt;site_name ) );<br/>
+} elseif ( is_user_admin() ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: User dashboard screen title. %s: Network name */<br/>
+&nbsp;&nbsp;&nbsp;$admin_title = sprintf( __( &#39;User Dashboard: %s&#39; ), esc_html( get_network()&ndash;&gt;site_name ) );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$admin_title = get_bloginfo( &#39;name&#39; );<br/>
+}<br/>
+<br/>
+if ( $admin_title == $title ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: Admin screen title. %s: Admin screen name */<br/>
+&nbsp;&nbsp;&nbsp;$admin_title = sprintf( __( &#39;%s &amp;#8212; WordPress&#39; ), $title );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: Admin screen title. 1: Admin screen name, 2: Network or site name */<br/>
+&nbsp;&nbsp;&nbsp;$admin_title = sprintf( __( &#39;%1$s &amp;lsaquo; %2$s &amp;#8212; WordPress&#39; ), $title, $admin_title );<br/>
+}<br/>
+<br/>
+if ( wp_is_recovery_mode() ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: Admin screen title. */<br/>
+&nbsp;&nbsp;&nbsp;$admin_title = sprintf( __( &#39;Recovery Mode &amp;#8212; %s&#39; ), $admin_title );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Filters the title tag content for an admin page.<br/>
+ *<br/>
+ * @since 3.1.0<br/>
+ *<br/>
+ * @param string $admin_title The page title, with extra context added.<br/>
+ * @param string $title       The original page title.<br/>
+ */<br/>
+$admin_title = apply_filters( &#39;admin_title&#39;, $admin_title, $title );<br/>
+<br/>
+wp_user_settings();<br/>
+<br/>
+_wp_admin_html_begin();<br/>
+?&gt;<br/>
+&lt;title&gt;&lt;?php echo $admin_title; ?&gt;&lt;/title&gt;<br/>
+&lt;?php<br/>
+<br/>
+wp_enqueue_style( &#39;colors&#39; );<br/>
+wp_enqueue_style( &#39;ie&#39; );<br/>
+wp_enqueue_script( &#39;utils&#39; );<br/>
+wp_enqueue_script( &#39;svg&ndash;painter&#39; );<br/>
+<br/>
+$admin_body_class = preg_replace( &#39;/[^a&ndash;z0&ndash;9_&ndash;]+/i&#39;, &#39;&ndash;&#39;, $hook_suffix );<br/>
+?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+addLoadEvent = function(func){if(typeof jQuery!==&#39;undefined&#39;)jQuery(document).ready(func);else if(typeof wpOnload!==&#39;function&#39;){wpOnload=func;}else{var oldonload=wpOnload;wpOnload=function(){oldonload();func();}}};<br/>
+var ajaxurl = &#39;&lt;?php echo esc_js( admin_url( &#39;admin&ndash;ajax.php&#39;, &#39;relative&#39; ) ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;pagenow = &#39;&lt;?php echo esc_js( $current_screen&ndash;&gt;id ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;typenow = &#39;&lt;?php echo esc_js( $current_screen&ndash;&gt;post_type ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;adminpage = &#39;&lt;?php echo esc_js( $admin_body_class ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;thousandsSeparator = &#39;&lt;?php echo esc_js( $wp_locale&ndash;&gt;number_format[&#39;thousands_sep&#39;] ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;decimalPoint = &#39;&lt;?php echo esc_js( $wp_locale&ndash;&gt;number_format[&#39;decimal_point&#39;] ); ?&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;isRtl = &lt;?php echo (int) is_rtl(); ?&gt;;<br/>
+&lt;/script&gt;<br/>
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device&ndash;width,initial&ndash;scale=1.0&quot;&gt;<br/>
+&lt;?php<br/>
+<br/>
+/**<br/>
+ * Enqueue scripts for all admin pages.<br/>
+ *<br/>
+ * @since 2.8.0<br/>
+ *<br/>
+ * @param string $hook_suffix The current admin page.<br/>
+ */<br/>
+do_action( &#39;admin_enqueue_scripts&#39;, $hook_suffix );<br/>
+<br/>
+/**<br/>
+ * Fires when styles are printed for a specific admin page based on $hook_suffix.<br/>
+ *<br/>
+ * @since 2.6.0<br/>
+ */<br/>
+do_action( &quot;admin_print_styles&ndash;{$hook_suffix}&quot; );<br/>
+<br/>
+/**<br/>
+ * Fires when styles are printed for all admin pages.<br/>
+ *<br/>
+ * @since 2.6.0<br/>
+ */<br/>
+do_action( &#39;admin_print_styles&#39; );<br/>
+<br/>
+/**<br/>
+ * Fires when scripts are printed for a specific admin page based on $hook_suffix.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+do_action( &quot;admin_print_scripts&ndash;{$hook_suffix}&quot; );<br/>
+<br/>
+/**<br/>
+ * Fires when scripts are printed for all admin pages.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+do_action( &#39;admin_print_scripts&#39; );<br/>
+<br/>
+/**<br/>
+ * Fires in head section for a specific admin page.<br/>
+ *<br/>
+ * The dynamic portion of the hook, `$hook_suffix`, refers to the hook suffix<br/>
+ * for the admin page.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+do_action( &quot;admin_head&ndash;{$hook_suffix}&quot; );<br/>
+<br/>
+/**<br/>
+ * Fires in head section for all admin pages.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+do_action( &#39;admin_head&#39; );<br/>
+<br/>
+if ( get_user_setting( &#39;mfold&#39; ) == &#39;f&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; folded&#39;;<br/>
+}<br/>
+<br/>
+if ( ! get_user_setting( &#39;unfold&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; auto&ndash;fold&#39;;<br/>
+}<br/>
+<br/>
+if ( is_admin_bar_showing() ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; admin&ndash;bar&#39;;<br/>
+}<br/>
+<br/>
+if ( is_rtl() ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; rtl&#39;;<br/>
+}<br/>
+<br/>
+if ( $current_screen&ndash;&gt;post_type ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; post&ndash;type&ndash;&#39; . $current_screen&ndash;&gt;post_type;<br/>
+}<br/>
+<br/>
+if ( $current_screen&ndash;&gt;taxonomy ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; taxonomy&ndash;&#39; . $current_screen&ndash;&gt;taxonomy;<br/>
+}<br/>
+<br/>
+$admin_body_class .= &#39; branch&ndash;&#39; . str_replace( array( &#39;.&#39;, &#39;,&#39; ), &#39;&ndash;&#39;, floatval( get_bloginfo( &#39;version&#39; ) ) );<br/>
+$admin_body_class .= &#39; version&ndash;&#39; . str_replace( &#39;.&#39;, &#39;&ndash;&#39;, preg_replace( &#39;/^([.0&ndash;9]+).*/&#39;, &#39;$1&#39;, get_bloginfo( &#39;version&#39; ) ) );<br/>
+$admin_body_class .= &#39; admin&ndash;color&ndash;&#39; . sanitize_html_class( get_user_option( &#39;admin_color&#39; ), &#39;fresh&#39; );<br/>
+$admin_body_class .= &#39; locale&ndash;&#39; . sanitize_html_class( strtolower( str_replace( &#39;_&#39;, &#39;&ndash;&#39;, get_user_locale() ) ) );<br/>
+<br/>
+if ( wp_is_mobile() ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; mobile&#39;;<br/>
+}<br/>
+<br/>
+if ( is_multisite() ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; multisite&#39;;<br/>
+}<br/>
+<br/>
+if ( is_network_admin() ) {<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; network&ndash;admin&#39;;<br/>
+}<br/>
+<br/>
+$admin_body_class .= &#39; no&ndash;customize&ndash;support no&ndash;svg&#39;;<br/>
+<br/>
+if ( $current_screen&ndash;&gt;is_block_editor() ) {<br/>
+&nbsp;&nbsp;&nbsp;// Default to is&ndash;fullscreen&ndash;mode to avoid jumps in the UI.<br/>
+&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; block&ndash;editor&ndash;page is&ndash;fullscreen&ndash;mode wp&ndash;embed&ndash;responsive&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( current_theme_supports( &#39;editor&ndash;styles&#39; ) &amp;&amp; current_theme_supports( &#39;dark&ndash;editor&ndash;style&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$admin_body_class .= &#39; is&ndash;dark&ndash;theme&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+?&gt;<br/>
+&lt;/head&gt;<br/>
+&lt;?php<br/>
+/**<br/>
+ * Filters the CSS classes for the body tag in the admin.<br/>
+ *<br/>
+ * This filter differs from the {@see &#39;post_class&#39;} and {@see &#39;body_class&#39;} filters<br/>
+ * in two important ways:<br/>
+ *<br/>
+ * 1. `$classes` is a space&ndash;separated string of class names instead of an array.<br/>
+ * 2. Not all core admin classes are filterable, notably: wp&ndash;admin, wp&ndash;core&ndash;ui,<br/>
+ *    and no&ndash;js cannot be removed.<br/>
+ *<br/>
+ * @since 2.3.0<br/>
+ *<br/>
+ * @param string $classes Space&ndash;separated list of CSS classes.<br/>
+ */<br/>
+$admin_body_classes = apply_filters( &#39;admin_body_class&#39;, &#39;&#39; );<br/>
+$admin_body_classes = ltrim( $admin_body_classes . &#39; &#39; . $admin_body_class );<br/>
+?&gt;<br/>
+&lt;body class=&quot;wp&ndash;admin wp&ndash;core&ndash;ui no&ndash;js &lt;?php echo $admin_body_classes; ?&gt;&quot;&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;document.body.className = document.body.className.replace(&#39;no&ndash;js&#39;,&#39;js&#39;);<br/>
+&lt;/script&gt;<br/>
+<br/>
+&lt;?php<br/>
+// Make sure the customize body classes are correct as early as possible.<br/>
+if ( current_user_can( &#39;customize&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_customize_support_script();<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;wpwrap&quot;&gt;<br/>
+&lt;?php require( ABSPATH . &#39;wp&ndash;admin/menu&ndash;header.php&#39; ); ?&gt;<br/>
+&lt;div id=&quot;wpcontent&quot;&gt;<br/>
+<br/>
+&lt;?php<br/>
+/**<br/>
+ * Fires at the beginning of the content section in an admin page.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ */<br/>
+do_action( &#39;in_admin_header&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;wpbody&quot; role=&quot;main&quot;&gt;<br/>
+&lt;?php<br/>
+unset( $blog_name, $total_update_count, $update_title );<br/>
+<br/>
+$current_screen&ndash;&gt;set_parentage( $parent_file );<br/>
+<br/>
+?&gt;<br/>
+<br/>
+&lt;div id=&quot;wpbody&ndash;content&quot;&gt;<br/>
+&lt;?php<br/>
+<br/>
+$current_screen&ndash;&gt;render_screen_meta();<br/>
+<br/>
+if ( is_network_admin() ) {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Prints network admin screen notices.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;network_admin_notices&#39; );<br/>
+} elseif ( is_user_admin() ) {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Prints user admin screen notices.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;user_admin_notices&#39; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Prints admin screen notices.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 3.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &#39;admin_notices&#39; );<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Prints generic admin screen notices.<br/>
+ *<br/>
+ * @since 3.1.0<br/>
+ */<br/>
+do_action( &#39;all_admin_notices&#39; );<br/>
+<br/>
+if ( $parent_file == &#39;options&ndash;general.php&#39; ) {<br/>
+&nbsp;&nbsp;&nbsp;require( ABSPATH . &#39;wp&ndash;admin/options&ndash;head.php&#39; );<br/>
+}</body></html>

@@ -1,0 +1,364 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Edit Comments Administration Screen.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+if ( ! current_user_can( &#39;edit_posts&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;You need a higher level of permission.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Sorry, you are not allowed to edit comments.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+$wp_list_table = _get_list_table( &#39;WP_Comments_List_Table&#39; );<br/>
+$pagenum       = $wp_list_table&ndash;&gt;get_pagenum();<br/>
+<br/>
+$doaction = $wp_list_table&ndash;&gt;current_action();<br/>
+<br/>
+if ( $doaction ) {<br/>
+&nbsp;&nbsp;&nbsp;check_admin_referer( &#39;bulk&ndash;comments&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( &#39;delete_all&#39; == $doaction &amp;&amp; ! empty( $_REQUEST[&#39;pagegen_timestamp&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_status = wp_unslash( $_REQUEST[&#39;comment_status&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$delete_time    = wp_unslash( $_REQUEST[&#39;pagegen_timestamp&#39;] );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_ids    = $wpdb&ndash;&gt;get_col( $wpdb&ndash;&gt;prepare( &quot;SELECT comment_ID FROM $wpdb&ndash;&gt;comments WHERE comment_approved = %s AND %s &gt; comment_date_gmt&quot;, $comment_status, $delete_time ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$doaction       = &#39;delete&#39;;<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( isset( $_REQUEST[&#39;delete_comments&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_ids = $_REQUEST[&#39;delete_comments&#39;];<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$doaction    = ( $_REQUEST[&#39;action&#39;] != &ndash;1 ) ? $_REQUEST[&#39;action&#39;] : $_REQUEST[&#39;action2&#39;];<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( isset( $_REQUEST[&#39;ids&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment_ids = array_map( &#39;absint&#39;, explode( &#39;,&#39;, $_REQUEST[&#39;ids&#39;] ) );<br/>
+&nbsp;&nbsp;&nbsp;} elseif ( wp_get_referer() ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_safe_redirect( wp_get_referer() );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$approved = $unapproved = $spammed = $unspammed = $trashed = $untrashed = $deleted = 0;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$redirect_to = remove_query_arg( array( &#39;trashed&#39;, &#39;untrashed&#39;, &#39;deleted&#39;, &#39;spammed&#39;, &#39;unspammed&#39;, &#39;approved&#39;, &#39;unapproved&#39;, &#39;ids&#39; ), wp_get_referer() );<br/>
+&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;paged&#39;, $pagenum, $redirect_to );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_defer_comment_counting( true );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $comment_ids as $comment_id ) { // Check the permissions on each<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ! current_user_can( &#39;edit_comment&#39;, $comment_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch ( $doaction ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;approve&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_set_comment_status( $comment_id, &#39;approve&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$approved++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;unapprove&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_set_comment_status( $comment_id, &#39;hold&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$unapproved++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;spam&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_spam_comment( $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$spammed++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;unspam&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_unspam_comment( $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$unspammed++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;trash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_trash_comment( $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$trashed++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;untrash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_untrash_comment( $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$untrashed++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;delete&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_delete_comment( $comment_id );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$deleted++;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( ! in_array( $doaction, array( &#39;approve&#39;, &#39;unapprove&#39;, &#39;spam&#39;, &#39;unspam&#39;, &#39;trash&#39;, &#39;delete&#39; ), true ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$screen = get_current_screen()&ndash;&gt;id;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires when a custom bulk action should be handled.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The redirect link should be modified with success or failure feedback<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * from the action to be used to display feedback to the user.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$screen`, refers to the current screen ID.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 4.7.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $redirect_url The redirect URL.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param string $doaction     The action being taken.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @param array  $items        The items to take the action on.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = apply_filters( &quot;handle_bulk_actions&ndash;{$screen}&quot;, $redirect_to, $doaction, $comment_ids );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_defer_comment_counting( false );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $approved ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;approved&#39;, $approved, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $unapproved ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;unapproved&#39;, $unapproved, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $spammed ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;spammed&#39;, $spammed, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $unspammed ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;unspammed&#39;, $unspammed, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $trashed ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;trashed&#39;, $trashed, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $untrashed ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;untrashed&#39;, $untrashed, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $deleted ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;deleted&#39;, $deleted, $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $trashed || $spammed ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$redirect_to = add_query_arg( &#39;ids&#39;, join( &#39;,&#39;, $comment_ids ), $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_safe_redirect( $redirect_to );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+} elseif ( ! empty( $_GET[&#39;_wp_http_referer&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_redirect( remove_query_arg( array( &#39;_wp_http_referer&#39;, &#39;_wpnonce&#39; ), wp_unslash( $_SERVER[&#39;REQUEST_URI&#39;] ) ) );<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+$wp_list_table&ndash;&gt;prepare_items();<br/>
+<br/>
+wp_enqueue_script( &#39;admin&ndash;comments&#39; );<br/>
+enqueue_comment_hotkeys_js();<br/>
+<br/>
+if ( $post_id ) {<br/>
+&nbsp;&nbsp;&nbsp;$comments_count      = wp_count_comments( $post_id );<br/>
+&nbsp;&nbsp;&nbsp;$draft_or_post_title = wp_html_excerpt( _draft_or_post_title( $post_id ), 50, &#39;&amp;hellip;&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( $comments_count&ndash;&gt;moderated &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: 1: comments count, 2: post title */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Comments (%1$s) on &amp;#8220;%2$s&amp;#8221;&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;number_format_i18n( $comments_count&ndash;&gt;moderated ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$draft_or_post_title<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: post title */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Comments on &amp;#8220;%s&amp;#8221;&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$draft_or_post_title<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$comments_count = wp_count_comments();<br/>
+&nbsp;&nbsp;&nbsp;if ( $comments_count&ndash;&gt;moderated &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: comments count */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Comments (%s)&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;number_format_i18n( $comments_count&ndash;&gt;moderated )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$title = __( &#39;Comments&#39; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+add_screen_option( &#39;per_page&#39; );<br/>
+<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;overview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Overview&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;You can manage comments made on your site similar to the way you manage posts and other content. This screen is customizable in the same ways as other management screens, and you can act on comments using the on&ndash;hover action links or the Bulk Actions.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+get_current_screen()&ndash;&gt;add_help_tab(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;id&#39;      =&gt; &#39;moderating&ndash;comments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;title&#39;   =&gt; __( &#39;Moderating Comments&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39; =&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;A red bar on the left means the comment is waiting for you to moderate it.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;In the &lt;strong&gt;Author&lt;/strong&gt; column, in addition to the author&amp;#8217;s name, email address, and blog URL, the commenter&amp;#8217;s IP address is shown. Clicking on this link will show you all the comments made from this IP address.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;In the &lt;strong&gt;Comment&lt;/strong&gt; column, hovering over any comment gives you options to approve, reply (and approve), quick edit, edit, spam mark, or trash that comment.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;In the &lt;strong&gt;In Response To&lt;/strong&gt; column, there are three elements. The text is the name of the post that inspired the comment, and links to the post editor for that entry. The View Post link leads to that post on your live site. The small bubble with the number in it shows the number of approved comments that post has received. If there are pending comments, a red notification circle with the number of pending comments is displayed. Clicking the notification circle will filter the comments screen to show only pending comments on that post.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;In the &lt;strong&gt;Submitted On&lt;/strong&gt; column, the date and time the comment was left on your site appears. Clicking on the date/time link will take you to that comment on your live site.&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &#39;&lt;p&gt;&#39; . __( &#39;Many people take advantage of keyboard shortcuts to moderate their comments more quickly. Use the link to the side to learn more.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_help_sidebar(<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&lt;strong&gt;&#39; . __( &#39;For more information:&#39; ) . &#39;&lt;/strong&gt;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Administration_Screens#Comments&quot;&gt;Documentation on Comments&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Comment_Spam&quot;&gt;Documentation on Comment Spam&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://codex.wordpress.org/Keyboard_Shortcuts&quot;&gt;Documentation on Keyboard Shortcuts&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;&lt;a href=&quot;https://wordpress.org/support/&quot;&gt;Support&lt;/a&gt;&#39; ) . &#39;&lt;/p&gt;&#39;<br/>
+);<br/>
+<br/>
+get_current_screen()&ndash;&gt;set_screen_reader_content(<br/>
+&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_views&#39;      =&gt; __( &#39;Filter comments list&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_pagination&#39; =&gt; __( &#39;Comments list navigation&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;heading_list&#39;       =&gt; __( &#39;Comments list&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;)<br/>
+);<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/admin&ndash;header.php&#39; );<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1 class=&quot;wp&ndash;heading&ndash;inline&quot;&gt;<br/>
+&lt;?php<br/>
+if ( $post_id ) {<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: link to post */<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Comments on &amp;#8220;%s&amp;#8221;&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;a href=&quot;%1$s&quot;&gt;%2$s&lt;/a&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get_edit_post_link( $post_id ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_html_excerpt( _draft_or_post_title( $post_id ), 50, &#39;&amp;hellip;&#39; )<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;_e( &#39;Comments&#39; );<br/>
+}<br/>
+?&gt;<br/>
+&lt;/h1&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( isset( $_REQUEST[&#39;s&#39;] ) &amp;&amp; strlen( $_REQUEST[&#39;s&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;span class=&quot;subtitle&quot;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: search keywords */<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;Search results for &amp;#8220;%s&amp;#8221;&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_html_excerpt( esc_html( wp_unslash( $_REQUEST[&#39;s&#39;] ) ), 50, &#39;&amp;hellip;&#39; )<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;/span&gt;&#39;;<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;hr class=&quot;wp&ndash;header&ndash;end&quot;&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( isset( $_REQUEST[&#39;error&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$error     = (int) $_REQUEST[&#39;error&#39;];<br/>
+&nbsp;&nbsp;&nbsp;$error_msg = &#39;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;switch ( $error ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 1:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error_msg = __( &#39;Invalid comment ID.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case 2:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$error_msg = __( &#39;Sorry, you are not allowed to edit comments on this post.&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;if ( $error_msg ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div id=&quot;moderated&quot; class=&quot;error&quot;&gt;&lt;p&gt;&#39; . $error_msg . &#39;&lt;/p&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+<br/>
+if ( isset( $_REQUEST[&#39;approved&#39;] ) || isset( $_REQUEST[&#39;deleted&#39;] ) || isset( $_REQUEST[&#39;trashed&#39;] ) || isset( $_REQUEST[&#39;untrashed&#39;] ) || isset( $_REQUEST[&#39;spammed&#39;] ) || isset( $_REQUEST[&#39;unspammed&#39;] ) || isset( $_REQUEST[&#39;same&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$approved  = isset( $_REQUEST[&#39;approved&#39;] ) ? (int) $_REQUEST[&#39;approved&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;$deleted   = isset( $_REQUEST[&#39;deleted&#39;] ) ? (int) $_REQUEST[&#39;deleted&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;$trashed   = isset( $_REQUEST[&#39;trashed&#39;] ) ? (int) $_REQUEST[&#39;trashed&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;$untrashed = isset( $_REQUEST[&#39;untrashed&#39;] ) ? (int) $_REQUEST[&#39;untrashed&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;$spammed   = isset( $_REQUEST[&#39;spammed&#39;] ) ? (int) $_REQUEST[&#39;spammed&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;$unspammed = isset( $_REQUEST[&#39;unspammed&#39;] ) ? (int) $_REQUEST[&#39;unspammed&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;$same      = isset( $_REQUEST[&#39;same&#39;] ) ? (int) $_REQUEST[&#39;same&#39;] : 0;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;if ( $approved &gt; 0 || $deleted &gt; 0 || $trashed &gt; 0 || $untrashed &gt; 0 || $spammed &gt; 0 || $unspammed &gt; 0 || $same &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $approved &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments approved */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( _n( &#39;%s comment approved&#39;, &#39;%s comments approved&#39;, $approved ), $approved );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $spammed &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ids = isset( $_REQUEST[&#39;ids&#39;] ) ? $_REQUEST[&#39;ids&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments marked as spam */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( _n( &#39;%s comment marked as spam.&#39;, &#39;%s comments marked as spam.&#39;, $spammed ), $spammed ) . &#39; &lt;a href=&quot;&#39; . esc_url( wp_nonce_url( &quot;edit&ndash;comments.php?doaction=undo&amp;action=unspam&amp;ids=$ids&quot;, &#39;bulk&ndash;comments&#39; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Undo&#39; ) . &#39;&lt;/a&gt;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $unspammed &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments restored from the spam */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( _n( &#39;%s comment restored from the spam&#39;, &#39;%s comments restored from the spam&#39;, $unspammed ), $unspammed );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $trashed &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$ids = isset( $_REQUEST[&#39;ids&#39;] ) ? $_REQUEST[&#39;ids&#39;] : 0;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments moved to the Trash */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( _n( &#39;%s comment moved to the Trash.&#39;, &#39;%s comments moved to the Trash.&#39;, $trashed ), $trashed ) . &#39; &lt;a href=&quot;&#39; . esc_url( wp_nonce_url( &quot;edit&ndash;comments.php?doaction=undo&amp;action=untrash&amp;ids=$ids&quot;, &#39;bulk&ndash;comments&#39; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Undo&#39; ) . &#39;&lt;/a&gt;&lt;br /&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $untrashed &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments restored from the Trash */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( _n( &#39;%s comment restored from the Trash&#39;, &#39;%s comments restored from the Trash&#39;, $untrashed ), $untrashed );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $deleted &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: number of comments permanently deleted */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = sprintf( _n( &#39;%s comment permanently deleted&#39;, &#39;%s comments permanently deleted&#39;, $deleted ), $deleted );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $same &gt; 0 &amp;&amp; $comment = get_comment( $same ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;switch ( $comment&ndash;&gt;comment_approved ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;1&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = __( &#39;This comment is already approved.&#39; ) . &#39; &lt;a href=&quot;&#39; . esc_url( admin_url( &quot;comment.php?action=editcomment&amp;c=$same&quot; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Edit comment&#39; ) . &#39;&lt;/a&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;trash&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = __( &#39;This comment is already in the Trash.&#39; ) . &#39; &lt;a href=&quot;&#39; . esc_url( admin_url( &#39;edit&ndash;comments.php?comment_status=trash&#39; ) ) . &#39;&quot;&gt; &#39; . __( &#39;View Trash&#39; ) . &#39;&lt;/a&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case &#39;spam&#39;:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messages[] = __( &#39;This comment is already marked as spam.&#39; ) . &#39; &lt;a href=&quot;&#39; . esc_url( admin_url( &quot;comment.php?action=editcomment&amp;c=$same&quot; ) ) . &#39;&quot;&gt;&#39; . __( &#39;Edit comment&#39; ) . &#39;&lt;/a&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;echo &#39;&lt;div id=&quot;moderated&quot; class=&quot;updated notice is&ndash;dismissible&quot;&gt;&lt;p&gt;&#39; . implode( &quot;&lt;br/&gt;\n&quot;, $messages ) . &#39;&lt;/p&gt;&lt;/div&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;views(); ?&gt;<br/>
+<br/>
+&lt;form id=&quot;comments&ndash;form&quot; method=&quot;get&quot;&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;search_box( __( &#39;Search Comments&#39; ), &#39;comment&#39; ); ?&gt;<br/>
+<br/>
+&lt;?php if ( $post_id ) : ?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;p&quot; value=&quot;&lt;?php echo esc_attr( intval( $post_id ) ); ?&gt;&quot; /&gt;<br/>
+&lt;?php endif; ?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;comment_status&quot; value=&quot;&lt;?php echo esc_attr( $comment_status ); ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;pagegen_timestamp&quot; value=&quot;&lt;?php echo esc_attr( current_time( &#39;mysql&#39;, 1 ) ); ?&gt;&quot; /&gt;<br/>
+<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;_total&quot; value=&quot;&lt;?php echo esc_attr( $wp_list_table&ndash;&gt;get_pagination_arg( &#39;total_items&#39; ) ); ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;_per_page&quot; value=&quot;&lt;?php echo esc_attr( $wp_list_table&ndash;&gt;get_pagination_arg( &#39;per_page&#39; ) ); ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;_page&quot; value=&quot;&lt;?php echo esc_attr( $wp_list_table&ndash;&gt;get_pagination_arg( &#39;page&#39; ) ); ?&gt;&quot; /&gt;<br/>
+<br/>
+&lt;?php if ( isset( $_REQUEST[&#39;paged&#39;] ) ) { ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;input type=&quot;hidden&quot; name=&quot;paged&quot; value=&quot;&lt;?php echo esc_attr( absint( $_REQUEST[&#39;paged&#39;] ) ); ?&gt;&quot; /&gt;<br/>
+&lt;?php } ?&gt;<br/>
+<br/>
+&lt;?php $wp_list_table&ndash;&gt;display(); ?&gt;<br/>
+&lt;/form&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;div id=&quot;ajax&ndash;response&quot;&gt;&lt;/div&gt;<br/>
+<br/>
+&lt;?php<br/>
+wp_comment_reply( &#39;&ndash;1&#39;, true, &#39;detail&#39; );<br/>
+wp_comment_trashnotice();<br/>
+include( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; ); ?&gt;</body></html>

@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Manage media uploaded file.<br/>
+ *<br/>
+ * There are many filters in here for media. Plugins can extend functionality<br/>
+ * by hooking into the filters.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+if ( ! isset( $_GET[&#39;inline&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;IFRAME_REQUEST&#39;, true );<br/>
+}<br/>
+<br/>
+/** Load WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! current_user_can( &#39;upload_files&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to upload files.&#39; ), 403 );<br/>
+}<br/>
+<br/>
+wp_enqueue_script( &#39;plupload&ndash;handlers&#39; );<br/>
+wp_enqueue_script( &#39;image&ndash;edit&#39; );<br/>
+wp_enqueue_script( &#39;set&ndash;post&ndash;thumbnail&#39; );<br/>
+wp_enqueue_style( &#39;imgareaselect&#39; );<br/>
+wp_enqueue_script( &#39;media&ndash;gallery&#39; );<br/>
+<br/>
+@header( &#39;Content&ndash;Type: &#39; . get_option( &#39;html_type&#39; ) . &#39;; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+<br/>
+// IDs should be integers<br/>
+$ID      = isset( $ID ) ? (int) $ID : 0;<br/>
+$post_id = isset( $post_id ) ? (int) $post_id : 0;<br/>
+<br/>
+// Require an ID for the edit screen.<br/>
+if ( isset( $action ) &amp;&amp; $action == &#39;edit&#39; &amp;&amp; ! $ID ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;Something went wrong.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Invalid item ID.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+if ( ! empty( $_REQUEST[&#39;post_id&#39;] ) &amp;&amp; ! current_user_can( &#39;edit_post&#39;, $_REQUEST[&#39;post_id&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;h1&gt;&#39; . __( &#39;You need a higher level of permission.&#39; ) . &#39;&lt;/h1&gt;&#39; .<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;p&gt;&#39; . __( &#39;Sorry, you are not allowed to edit this item.&#39; ) . &#39;&lt;/p&gt;&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;403<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+}<br/>
+<br/>
+// Upload type: image, video, file, ..?<br/>
+if ( isset( $_GET[&#39;type&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$type = strval( $_GET[&#39;type&#39;] );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the default media upload type in the legacy (pre&ndash;3.5.0) media popup.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $type The default media upload type. Possible values include<br/>
+&nbsp;&nbsp;&nbsp; *                     &#39;image&#39;, &#39;audio&#39;, &#39;video&#39;, &#39;file&#39;, etc. Default &#39;file&#39;.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$type = apply_filters( &#39;media_upload_default_type&#39;, &#39;file&#39; );<br/>
+}<br/>
+<br/>
+// Tab: gallery, library, or type&ndash;specific.<br/>
+if ( isset( $_GET[&#39;tab&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$tab = strval( $_GET[&#39;tab&#39;] );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters the default tab in the legacy (pre&ndash;3.5.0) media popup.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $type The default media popup tab. Default &#39;type&#39; (From Computer).<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;$tab = apply_filters( &#39;media_upload_default_tab&#39;, &#39;type&#39; );<br/>
+}<br/>
+<br/>
+$body_id = &#39;media&ndash;upload&#39;;<br/>
+<br/>
+// Let the action code decide how to handle the request.<br/>
+if ( $tab == &#39;type&#39; || $tab == &#39;type_url&#39; || ! array_key_exists( $tab, media_upload_tabs() ) ) {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires inside specific upload&ndash;type views in the legacy (pre&ndash;3.5.0)<br/>
+&nbsp;&nbsp;&nbsp; * media popup based on the current tab.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$type`, refers to the specific<br/>
+&nbsp;&nbsp;&nbsp; * media upload type. Possible values include &#39;image&#39;, &#39;audio&#39;, &#39;video&#39;,<br/>
+&nbsp;&nbsp;&nbsp; * &#39;file&#39;, etc.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The hook only fires if the current `$tab` is &#39;type&#39; (From Computer),<br/>
+&nbsp;&nbsp;&nbsp; * &#39;type_url&#39; (From URL), or, if the tab does not exist (i.e., has not<br/>
+&nbsp;&nbsp;&nbsp; * been registered via the {@see &#39;media_upload_tabs&#39;} filter.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;media_upload_{$type}&quot; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires inside limited and specific upload&ndash;tab views in the legacy<br/>
+&nbsp;&nbsp;&nbsp; * (pre&ndash;3.5.0) media popup.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$tab`, refers to the specific<br/>
+&nbsp;&nbsp;&nbsp; * media upload tab. Possible values include &#39;library&#39; (Media Library),<br/>
+&nbsp;&nbsp;&nbsp; * or any custom tab registered via the {@see &#39;media_upload_tabs&#39;} filter.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.5.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;media_upload_{$tab}&quot; );<br/>
+}<br/>
+</body></html>

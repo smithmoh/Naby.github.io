@@ -1,0 +1,110 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * XML&ndash;RPC protocol support for WordPress<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * Whether this is an XML&ndash;RPC Request<br/>
+ *<br/>
+ * @var bool<br/>
+ */<br/>
+define( &#39;XMLRPC_REQUEST&#39;, true );<br/>
+<br/>
+// Some browser&ndash;embedded clients send cookies. We don&#39;t want them.<br/>
+$_COOKIE = array();<br/>
+<br/>
+// A bug in PHP &lt; 5.2.2 makes $HTTP_RAW_POST_DATA not set by default,<br/>
+// but we can do it ourself.<br/>
+if ( ! isset( $HTTP_RAW_POST_DATA ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$HTTP_RAW_POST_DATA = file_get_contents( &#39;php://input&#39; );<br/>
+}<br/>
+<br/>
+// fix for mozBlog and other cases where &#39;&lt;?xml&#39; isn&#39;t on the very first line<br/>
+if ( isset( $HTTP_RAW_POST_DATA ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$HTTP_RAW_POST_DATA = trim( $HTTP_RAW_POST_DATA );<br/>
+}<br/>
+<br/>
+/** Include the bootstrap for setting up WordPress environment */<br/>
+include( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+if ( isset( $_GET[&#39;rsd&#39;] ) ) { // http://cyber.law.harvard.edu/blogs/gems/tech/rsd.html<br/>
+&nbsp;&nbsp;&nbsp;header( &#39;Content&ndash;Type: text/xml; charset=&#39; . get_option( &#39;blog_charset&#39; ), true );<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;?xml version=&quot;1.0&quot; encoding=&quot;&#39; . get_option( &#39;blog_charset&#39; ) . &#39;&quot;?&#39; . &#39;&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;rsd version=&quot;1.0&quot; xmlns=&quot;http://archipelago.phrasewise.com/rsd&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;service&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;engineName&gt;WordPress&lt;/engineName&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;engineLink&gt;https://wordpress.org/&lt;/engineLink&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;homePageLink&gt;&lt;?php bloginfo_rss( &#39;url&#39; ); ?&gt;&lt;/homePageLink&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;apis&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;api name=&quot;WordPress&quot; blogID=&quot;1&quot; preferred=&quot;true&quot; apiLink=&quot;&lt;?php echo site_url( &#39;xmlrpc.php&#39;, &#39;rpc&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;api name=&quot;Movable Type&quot; blogID=&quot;1&quot; preferred=&quot;false&quot; apiLink=&quot;&lt;?php echo site_url( &#39;xmlrpc.php&#39;, &#39;rpc&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;api name=&quot;MetaWeblog&quot; blogID=&quot;1&quot; preferred=&quot;false&quot; apiLink=&quot;&lt;?php echo site_url( &#39;xmlrpc.php&#39;, &#39;rpc&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;api name=&quot;Blogger&quot; blogID=&quot;1&quot; preferred=&quot;false&quot; apiLink=&quot;&lt;?php echo site_url( &#39;xmlrpc.php&#39;, &#39;rpc&#39; ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Add additional APIs to the Really Simple Discovery (RSD) endpoint.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @link http://cyber.law.harvard.edu/blogs/gems/tech/rsd.html<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 3.5.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;xmlrpc_rsd_apis&#39; );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/apis&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/service&gt;<br/>
+&lt;/rsd&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;exit;<br/>
+}<br/>
+<br/>
+include_once( ABSPATH . &#39;wp&ndash;admin/includes/admin.php&#39; );<br/>
+include_once( ABSPATH . WPINC . &#39;/class&ndash;IXR.php&#39; );<br/>
+include_once( ABSPATH . WPINC . &#39;/class&ndash;wp&ndash;xmlrpc&ndash;server.php&#39; );<br/>
+<br/>
+/**<br/>
+ * Posts submitted via the XML&ndash;RPC interface get that title<br/>
+ *<br/>
+ * @name post_default_title<br/>
+ * @var string<br/>
+ */<br/>
+$post_default_title = &#39;&#39;;<br/>
+<br/>
+/**<br/>
+ * Filters the class used for handling XML&ndash;RPC requests.<br/>
+ *<br/>
+ * @since 3.1.0<br/>
+ *<br/>
+ * @param string $class The name of the XML&ndash;RPC server class.<br/>
+ */<br/>
+$wp_xmlrpc_server_class = apply_filters( &#39;wp_xmlrpc_server_class&#39;, &#39;wp_xmlrpc_server&#39; );<br/>
+$wp_xmlrpc_server       = new $wp_xmlrpc_server_class;<br/>
+<br/>
+// Fire off the request<br/>
+$wp_xmlrpc_server&ndash;&gt;serve_request();<br/>
+<br/>
+exit;<br/>
+<br/>
+/**<br/>
+ * logIO() &ndash; Writes logging info to a file.<br/>
+ *<br/>
+ * @deprecated 3.4.0 Use error_log()<br/>
+ * @see error_log()<br/>
+ *<br/>
+ * @param string $io Whether input or output<br/>
+ * @param string $msg Information describing logging reason.<br/>
+ */<br/>
+function logIO( $io, $msg ) {<br/>
+&nbsp;&nbsp;&nbsp;_deprecated_function( __FUNCTION__, &#39;3.4.0&#39;, &#39;error_log()&#39; );<br/>
+&nbsp;&nbsp;&nbsp;if ( ! empty( $GLOBALS[&#39;xmlrpc_logging&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;error_log( $io . &#39; &ndash; &#39; . $msg );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}</body></html>

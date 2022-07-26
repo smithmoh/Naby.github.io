@@ -1,0 +1,97 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * The base configuration for WordPress<br/>
+ *<br/>
+ * The wp&ndash;config.php creation script uses this file during the installation.<br/>
+ * You don&#39;t have to use the web site, you can copy this file to &quot;wp&ndash;config.php&quot;<br/>
+ * and fill in the values.<br/>
+ *<br/>
+ * This file contains the following configurations:<br/>
+ *<br/>
+ * * Database settings<br/>
+ * * Secret keys<br/>
+ * * Database table prefix<br/>
+ * * Localized language<br/>
+ * * ABSPATH<br/>
+ *<br/>
+ * @link https://wordpress.org/support/article/editing&ndash;wp&ndash;config&ndash;php/<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+// ** Database settings &ndash; You can get this info from your web host ** //<br/>
+/** The name of the database for WordPress */<br/>
+define( &#39;DB_NAME&#39;, &#39;local&#39; );<br/>
+<br/>
+/** Database username */<br/>
+define( &#39;DB_USER&#39;, &#39;root&#39; );<br/>
+<br/>
+/** Database password */<br/>
+define( &#39;DB_PASSWORD&#39;, &#39;root&#39; );<br/>
+<br/>
+/** Database hostname */<br/>
+define( &#39;DB_HOST&#39;, &#39;localhost&#39; );<br/>
+<br/>
+/** Database charset to use in creating database tables. */<br/>
+define( &#39;DB_CHARSET&#39;, &#39;utf8&#39; );<br/>
+<br/>
+/** The database collate type. Don&#39;t change this if in doubt. */<br/>
+define( &#39;DB_COLLATE&#39;, &#39;&#39; );<br/>
+<br/>
+/**#@+<br/>
+ * Authentication unique keys and salts.<br/>
+ *<br/>
+ * Change these to different unique phrases! You can generate these using<br/>
+ * the {@link https://api.wordpress.org/secret&ndash;key/1.1/salt/ WordPress.org secret&ndash;key service}.<br/>
+ *<br/>
+ * You can change these at any point in time to invalidate all existing cookies.<br/>
+ * This will force all users to have to log in again.<br/>
+ *<br/>
+ * @since 2.6.0<br/>
+ */<br/>
+<br/>
+<br/>
+/**#@&ndash;*/<br/>
+<br/>
+/**<br/>
+ * WordPress database table prefix.<br/>
+ *<br/>
+ * You can have multiple installations in one database if you give each<br/>
+ * a unique prefix. Only numbers, letters, and underscores please!<br/>
+ */<br/>
+$table_prefix = &#39;wp_&#39;;<br/>
+<br/>
+/**<br/>
+ * For developers: WordPress debugging mode.<br/>
+ *<br/>
+ * Change this to true to enable the display of notices during development.<br/>
+ * It is strongly recommended that plugin and theme developers use WP_DEBUG<br/>
+ * in their development environments.<br/>
+ *<br/>
+ * For information on other constants that can be used for debugging,<br/>
+ * visit the documentation.<br/>
+ *<br/>
+ * @link https://wordpress.org/support/article/debugging&ndash;in&ndash;wordpress/<br/>
+ */<br/>
+define( &#39;WP_DEBUG&#39;, false );<br/>
+<br/>
+<br/>
+/* Add any custom values between this line and the &quot;stop editing&quot; line. */<br/>
+<br/>
+<br/>
+<br/>
+/* That&#39;s all, stop editing! Happy publishing. */<br/>
+<br/>
+/** Absolute path to the WordPress directory. */<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;ABSPATH&#39;, __DIR__ . &#39;/&#39; );<br/>
+}<br/>
+<br/>
+/** Sets up WordPress vars and included files. */<br/>
+require_once ABSPATH . &#39;wp&ndash;settings.php&#39;;</body></html>

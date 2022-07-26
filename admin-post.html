@@ -1,0 +1,78 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Generic Request (POST/GET) Handler<br/>
+ *<br/>
+ * Intended for form submission handling in themes and plugins.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** We are located in WordPress Administration Screens */<br/>
+if ( ! defined( &#39;WP_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_ADMIN&#39;, true );<br/>
+}<br/>
+<br/>
+if ( defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;load.php&#39; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( dirname( __FILE__ ) ) . &#39;/wp&ndash;load.php&#39; );<br/>
+}<br/>
+<br/>
+/** Allow for cross&ndash;domain requests (from the front end). */<br/>
+send_origin_headers();<br/>
+<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/admin.php&#39; );<br/>
+<br/>
+nocache_headers();<br/>
+<br/>
+/** This action is documented in wp&ndash;admin/admin.php */<br/>
+do_action( &#39;admin_init&#39; );<br/>
+<br/>
+$action = empty( $_REQUEST[&#39;action&#39;] ) ? &#39;&#39; : $_REQUEST[&#39;action&#39;];<br/>
+<br/>
+if ( ! is_user_logged_in() ) {<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $action ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires on a non&ndash;authenticated admin post request where no action is supplied.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;admin_post_nopriv&#39; );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires on a non&ndash;authenticated admin post request for the given action.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$action`, refers to the given<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * request action.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &quot;admin_post_nopriv_{$action}&quot; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;if ( empty( $action ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires on an authenticated admin post request where no action is supplied.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &#39;admin_post&#39; );<br/>
+&nbsp;&nbsp;&nbsp;} else {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * Fires on an authenticated admin post request for the given action.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$action`, refers to the given<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * request action.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * @since 2.6.0<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do_action( &quot;admin_post_{$action}&quot; );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+}</body></html>

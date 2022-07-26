@@ -1,0 +1,197 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * WordPress Ajax Process Execution<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ *<br/>
+ * @link https://codex.wordpress.org/AJAX_in_Plugins<br/>
+ */<br/>
+<br/>
+/**<br/>
+ * Executing Ajax process.<br/>
+ *<br/>
+ * @since 2.1.0<br/>
+ */<br/>
+define( &#39;DOING_AJAX&#39;, true );<br/>
+if ( ! defined( &#39;WP_ADMIN&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_ADMIN&#39;, true );<br/>
+}<br/>
+<br/>
+/** Load WordPress Bootstrap */<br/>
+require_once( dirname( dirname( __FILE__ ) ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+/** Allow for cross&ndash;domain requests (from the front end). */<br/>
+send_origin_headers();<br/>
+<br/>
+// Require an action parameter<br/>
+if ( empty( $_REQUEST[&#39;action&#39;] ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( &#39;0&#39;, 400 );<br/>
+}<br/>
+<br/>
+/** Load WordPress Administration APIs */<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/admin.php&#39; );<br/>
+<br/>
+/** Load Ajax Handlers for WordPress Core */<br/>
+require_once( ABSPATH . &#39;wp&ndash;admin/includes/ajax&ndash;actions.php&#39; );<br/>
+<br/>
+@header( &#39;Content&ndash;Type: text/html; charset=&#39; . get_option( &#39;blog_charset&#39; ) );<br/>
+@header( &#39;X&ndash;Robots&ndash;Tag: noindex&#39; );<br/>
+<br/>
+send_nosniff_header();<br/>
+nocache_headers();<br/>
+<br/>
+/** This action is documented in wp&ndash;admin/admin.php */<br/>
+do_action( &#39;admin_init&#39; );<br/>
+<br/>
+$core_actions_get = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;fetch&ndash;list&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;ajax&ndash;tag&ndash;search&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;compression&ndash;test&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;imgedit&ndash;preview&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;oembed&ndash;cache&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;autocomplete&ndash;user&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;dashboard&ndash;widgets&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;logged&ndash;in&#39;,<br/>
+);<br/>
+<br/>
+$core_actions_post = array(<br/>
+&nbsp;&nbsp;&nbsp;&#39;oembed&ndash;cache&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;image&ndash;editor&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;comment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;tag&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;link&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;meta&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;post&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;trash&ndash;post&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;untrash&ndash;post&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;page&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;dim&ndash;comment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;add&ndash;link&ndash;category&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;add&ndash;tag&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;tagcloud&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;comments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;replyto&ndash;comment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;edit&ndash;comment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;add&ndash;menu&ndash;item&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;add&ndash;meta&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;add&ndash;user&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;closed&ndash;postboxes&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;hidden&ndash;columns&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;update&ndash;welcome&ndash;panel&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;menu&ndash;get&ndash;metabox&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;link&ndash;ajax&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;menu&ndash;locations&ndash;save&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;menu&ndash;quick&ndash;search&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;meta&ndash;box&ndash;order&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;permalink&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;sample&ndash;permalink&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;inline&ndash;save&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;inline&ndash;save&ndash;tax&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;find_posts&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;widgets&ndash;order&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;save&ndash;widget&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;inactive&ndash;widgets&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;set&ndash;post&ndash;thumbnail&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;date_format&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;time_format&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;remove&ndash;post&ndash;lock&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;dismiss&ndash;wp&ndash;pointer&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;upload&ndash;attachment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;attachment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;query&ndash;attachments&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;save&ndash;attachment&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;save&ndash;attachment&ndash;compat&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;send&ndash;link&ndash;to&ndash;editor&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;send&ndash;attachment&ndash;to&ndash;editor&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;save&ndash;attachment&ndash;order&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;heartbeat&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;revision&ndash;diffs&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;save&ndash;user&ndash;color&ndash;scheme&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;update&ndash;widget&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;query&ndash;themes&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;parse&ndash;embed&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;set&ndash;attachment&ndash;thumbnail&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;parse&ndash;media&ndash;shortcode&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;destroy&ndash;sessions&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;install&ndash;plugin&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;update&ndash;plugin&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;crop&ndash;image&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;generate&ndash;password&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;save&ndash;wporg&ndash;username&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;plugin&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;search&ndash;plugins&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;search&ndash;install&ndash;plugins&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;activate&ndash;plugin&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;update&ndash;theme&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;delete&ndash;theme&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;install&ndash;theme&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;post&ndash;thumbnail&ndash;html&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;get&ndash;community&ndash;events&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;edit&ndash;theme&ndash;plugin&ndash;file&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;privacy&ndash;export&ndash;personal&ndash;data&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;wp&ndash;privacy&ndash;erase&ndash;personal&ndash;data&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;health&ndash;check&ndash;site&ndash;status&ndash;result&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;health&ndash;check&ndash;dotorg&ndash;communication&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;health&ndash;check&ndash;is&ndash;in&ndash;debug&ndash;mode&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;health&ndash;check&ndash;background&ndash;updates&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;health&ndash;check&ndash;loopback&ndash;requests&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&#39;health&ndash;check&ndash;get&ndash;sizes&#39;,<br/>
+);<br/>
+<br/>
+// Deprecated<br/>
+$core_actions_post_deprecated = array( &#39;wp&ndash;fullscreen&ndash;save&ndash;post&#39;, &#39;press&ndash;this&ndash;save&ndash;post&#39;, &#39;press&ndash;this&ndash;add&ndash;category&#39; );<br/>
+$core_actions_post            = array_merge( $core_actions_post, $core_actions_post_deprecated );<br/>
+<br/>
+// Register core Ajax calls.<br/>
+if ( ! empty( $_GET[&#39;action&#39;] ) &amp;&amp; in_array( $_GET[&#39;action&#39;], $core_actions_get ) ) {<br/>
+&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_&#39; . $_GET[&#39;action&#39;], &#39;wp_ajax_&#39; . str_replace( &#39;&ndash;&#39;, &#39;_&#39;, $_GET[&#39;action&#39;] ), 1 );<br/>
+}<br/>
+<br/>
+if ( ! empty( $_POST[&#39;action&#39;] ) &amp;&amp; in_array( $_POST[&#39;action&#39;], $core_actions_post ) ) {<br/>
+&nbsp;&nbsp;&nbsp;add_action( &#39;wp_ajax_&#39; . $_POST[&#39;action&#39;], &#39;wp_ajax_&#39; . str_replace( &#39;&ndash;&#39;, &#39;_&#39;, $_POST[&#39;action&#39;] ), 1 );<br/>
+}<br/>
+<br/>
+add_action( &#39;wp_ajax_nopriv_heartbeat&#39;, &#39;wp_ajax_nopriv_heartbeat&#39;, 1 );<br/>
+<br/>
+$action = ( isset( $_REQUEST[&#39;action&#39;] ) ) ? $_REQUEST[&#39;action&#39;] : &#39;&#39;;<br/>
+<br/>
+if ( is_user_logged_in() ) {<br/>
+&nbsp;&nbsp;&nbsp;// If no action is registered, return a Bad Request response.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! has_action( &quot;wp_ajax_{$action}&quot; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( &#39;0&#39;, 400 );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires authenticated Ajax actions for logged&ndash;in users.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$action`, refers<br/>
+&nbsp;&nbsp;&nbsp; * to the name of the Ajax action callback being fired.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.1.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;wp_ajax_{$action}&quot; );<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;// If no action is registered, return a Bad Request response.<br/>
+&nbsp;&nbsp;&nbsp;if ( ! has_action( &quot;wp_ajax_nopriv_{$action}&quot; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wp_die( &#39;0&#39;, 400 );<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Fires non&ndash;authenticated Ajax actions for logged&ndash;out users.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * The dynamic portion of the hook name, `$action`, refers<br/>
+&nbsp;&nbsp;&nbsp; * to the name of the Ajax action callback being fired.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 2.8.0<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;do_action( &quot;wp_ajax_nopriv_{$action}&quot; );<br/>
+}<br/>
+// Default status<br/>
+wp_die( &#39;0&#39; );</body></html>

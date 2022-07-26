@@ -1,0 +1,37 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Add Link Administration Screen.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+/** Load WordPress Administration Bootstrap */<br/>
+require_once( dirname( __FILE__ ) . &#39;/admin.php&#39; );<br/>
+<br/>
+if ( ! current_user_can( &#39;manage_links&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_die( __( &#39;Sorry, you are not allowed to add links to this site.&#39; ) );<br/>
+}<br/>
+<br/>
+$title       = __( &#39;Add New Link&#39; );<br/>
+$parent_file = &#39;link&ndash;manager.php&#39;;<br/>
+<br/>
+wp_reset_vars( array( &#39;action&#39;, &#39;cat_id&#39;, &#39;link_id&#39; ) );<br/>
+<br/>
+wp_enqueue_script( &#39;link&#39; );<br/>
+wp_enqueue_script( &#39;xfn&#39; );<br/>
+<br/>
+if ( wp_is_mobile() ) {<br/>
+&nbsp;&nbsp;&nbsp;wp_enqueue_script( &#39;jquery&ndash;touch&ndash;punch&#39; );<br/>
+}<br/>
+<br/>
+$link = get_default_link_to_edit();<br/>
+include( ABSPATH . &#39;wp&ndash;admin/edit&ndash;link&ndash;form.php&#39; );<br/>
+<br/>
+require( ABSPATH . &#39;wp&ndash;admin/admin&ndash;footer.php&#39; );</body></html>

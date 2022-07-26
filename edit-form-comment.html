@@ -1,0 +1,238 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Edit comment form for inclusion in another file.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Administration<br/>
+ */<br/>
+<br/>
+// don&#39;t load directly<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;die( &#39;&ndash;1&#39; );<br/>
+}<br/>
+?&gt;<br/>
+&lt;form name=&quot;post&quot; action=&quot;comment.php&quot; method=&quot;post&quot; id=&quot;post&quot;&gt;<br/>
+&lt;?php wp_nonce_field( &#39;update&ndash;comment_&#39; . $comment&ndash;&gt;comment_ID ); ?&gt;<br/>
+&lt;div class=&quot;wrap&quot;&gt;<br/>
+&lt;h1&gt;&lt;?php _e( &#39;Edit Comment&#39; ); ?&gt;&lt;/h1&gt;<br/>
+<br/>
+&lt;div id=&quot;poststuff&quot;&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;action&quot; value=&quot;editedcomment&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;comment_ID&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_ID ); ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;comment_post_ID&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_post_ID ); ?&gt;&quot; /&gt;<br/>
+<br/>
+&lt;div id=&quot;post&ndash;body&quot; class=&quot;metabox&ndash;holder columns&ndash;2&quot;&gt;<br/>
+&lt;div id=&quot;post&ndash;body&ndash;content&quot; class=&quot;edit&ndash;form&ndash;section edit&ndash;comment&ndash;section&quot;&gt;<br/>
+&lt;?php<br/>
+if ( &#39;approved&#39; === wp_get_comment_status( $comment ) &amp;&amp; $comment&ndash;&gt;comment_post_ID &gt; 0 ) :<br/>
+&nbsp;&nbsp;&nbsp;$comment_link = get_comment_link( $comment );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;div class=&quot;inside&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div id=&quot;comment&ndash;link&ndash;box&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;strong&gt;&lt;?php _ex( &#39;Permalink:&#39;, &#39;comment&#39; ); ?&gt;&lt;/strong&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span id=&quot;sample&ndash;permalink&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;a href=&quot;&lt;?php echo esc_url( $comment_link ); ?&gt;&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php echo esc_html( $comment_link ); ?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/a&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/span&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;?php endif; ?&gt;<br/>
+&lt;div id=&quot;namediv&quot; class=&quot;stuffbox&quot;&gt;<br/>
+&lt;div class=&quot;inside&quot;&gt;<br/>
+&lt;h2 class=&quot;edit&ndash;comment&ndash;author&quot;&gt;&lt;?php _e( &#39;Author&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&lt;fieldset&gt;<br/>
+&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Comment Author&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&lt;table class=&quot;form&ndash;table editcomment&quot; role=&quot;presentation&quot;&gt;<br/>
+&lt;tbody&gt;<br/>
+&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td class=&quot;first&quot;&gt;&lt;label for=&quot;name&quot;&gt;&lt;?php _e( &#39;Name&#39; ); ?&gt;&lt;/label&gt;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td&gt;&lt;input type=&quot;text&quot; name=&quot;newcomment_author&quot; size=&quot;30&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_author ); ?&gt;&quot; id=&quot;name&quot; /&gt;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td class=&quot;first&quot;&gt;&lt;label for=&quot;email&quot;&gt;&lt;?php _e( &#39;Email&#39; ); ?&gt;&lt;/label&gt;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; name=&quot;newcomment_author_email&quot; size=&quot;30&quot; value=&quot;&lt;?php echo $comment&ndash;&gt;comment_author_email; ?&gt;&quot; id=&quot;email&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;tr&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td class=&quot;first&quot;&gt;&lt;label for=&quot;newcomment_author_url&quot;&gt;&lt;?php _e( &#39;URL&#39; ); ?&gt;&lt;/label&gt;&lt;/td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;td&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;input type=&quot;text&quot; id=&quot;newcomment_author_url&quot; name=&quot;newcomment_author_url&quot; size=&quot;30&quot; class=&quot;code&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_author_url ); ?&gt;&quot; /&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/td&gt;<br/>
+&lt;/tr&gt;<br/>
+&lt;/tbody&gt;<br/>
+&lt;/table&gt;<br/>
+&lt;/fieldset&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;div id=&quot;postdiv&quot; class=&quot;postarea&quot;&gt;<br/>
+&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;echo &#39;&lt;label for=&quot;content&quot; class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&#39; . __( &#39;Comment&#39; ) . &#39;&lt;/label&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$quicktags_settings = array( &#39;buttons&#39; =&gt; &#39;strong,em,link,block,del,ins,img,ul,ol,li,code,close&#39; );<br/>
+&nbsp;&nbsp;&nbsp;wp_editor(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$comment&ndash;&gt;comment_content,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;content&#39;,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;array(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;media_buttons&#39; =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;tinymce&#39;       =&gt; false,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;quicktags&#39;     =&gt; $quicktags_settings,<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;wp_nonce_field( &#39;closedpostboxes&#39;, &#39;closedpostboxesnonce&#39;, false );<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;&lt;!&ndash;&ndash; /post&ndash;body&ndash;content &ndash;&ndash;&gt;<br/>
+<br/>
+&lt;div id=&quot;postbox&ndash;container&ndash;1&quot; class=&quot;postbox&ndash;container&quot;&gt;<br/>
+&lt;div id=&quot;submitdiv&quot; class=&quot;stuffbox&quot; &gt;<br/>
+&lt;h2&gt;&lt;?php _e( &#39;Status&#39; ); ?&gt;&lt;/h2&gt;<br/>
+&lt;div class=&quot;inside&quot;&gt;<br/>
+&lt;div class=&quot;submitbox&quot; id=&quot;submitcomment&quot;&gt;<br/>
+&lt;div id=&quot;minor&ndash;publishing&quot;&gt;<br/>
+<br/>
+&lt;div id=&quot;misc&ndash;publishing&ndash;actions&quot;&gt;<br/>
+<br/>
+&lt;fieldset class=&quot;misc&ndash;pub&ndash;section misc&ndash;pub&ndash;comment&ndash;status&quot; id=&quot;comment&ndash;status&ndash;radio&quot;&gt;<br/>
+&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Comment status&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&lt;label&gt;&lt;input type=&quot;radio&quot;&lt;?php checked( $comment&ndash;&gt;comment_approved, &#39;1&#39; ); ?&gt; name=&quot;comment_status&quot; value=&quot;1&quot; /&gt;&lt;?php _ex( &#39;Approved&#39;, &#39;comment status&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&lt;label&gt;&lt;input type=&quot;radio&quot;&lt;?php checked( $comment&ndash;&gt;comment_approved, &#39;0&#39; ); ?&gt; name=&quot;comment_status&quot; value=&quot;0&quot; /&gt;&lt;?php _ex( &#39;Pending&#39;, &#39;comment status&#39; ); ?&gt;&lt;/label&gt;&lt;br /&gt;<br/>
+&lt;label&gt;&lt;input type=&quot;radio&quot;&lt;?php checked( $comment&ndash;&gt;comment_approved, &#39;spam&#39; ); ?&gt; name=&quot;comment_status&quot; value=&quot;spam&quot; /&gt;&lt;?php _ex( &#39;Spam&#39;, &#39;comment status&#39; ); ?&gt;&lt;/label&gt;<br/>
+&lt;/fieldset&gt;<br/>
+<br/>
+&lt;div class=&quot;misc&ndash;pub&ndash;section curtime misc&ndash;pub&ndash;curtime&quot;&gt;<br/>
+&lt;?php<br/>
+/* translators: Publish box date format, see https://secure.php.net/date */<br/>
+$datef = __( &#39;M j, Y @ H:i&#39; );<br/>
+?&gt;<br/>
+&lt;span id=&quot;timestamp&quot;&gt;<br/>
+&lt;?php<br/>
+printf(<br/>
+&nbsp;&nbsp;&nbsp;/* translators: %s: comment date */<br/>
+&nbsp;&nbsp;&nbsp;__( &#39;Submitted on: %s&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&#39;&lt;b&gt;&#39; . date_i18n( $datef, strtotime( $comment&ndash;&gt;comment_date ) ) . &#39;&lt;/b&gt;&#39;<br/>
+);<br/>
+?&gt;<br/>
+&lt;/span&gt;<br/>
+&lt;a href=&quot;#edit_timestamp&quot; class=&quot;edit&ndash;timestamp hide&ndash;if&ndash;no&ndash;js&quot;&gt;&lt;span aria&ndash;hidden=&quot;true&quot;&gt;&lt;?php _e( &#39;Edit&#39; ); ?&gt;&lt;/span&gt; &lt;span class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Edit date and time&#39; ); ?&gt;&lt;/span&gt;&lt;/a&gt;<br/>
+&lt;fieldset id=&#39;timestampdiv&#39; class=&#39;hide&ndash;if&ndash;js&#39;&gt;<br/>
+&lt;legend class=&quot;screen&ndash;reader&ndash;text&quot;&gt;&lt;?php _e( &#39;Date and time&#39; ); ?&gt;&lt;/legend&gt;<br/>
+&lt;?php touch_time( ( &#39;editcomment&#39; === $action ), 0 ); ?&gt;<br/>
+&lt;/fieldset&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php<br/>
+$post_id = $comment&ndash;&gt;comment_post_ID;<br/>
+if ( current_user_can( &#39;edit_post&#39;, $post_id ) ) {<br/>
+&nbsp;&nbsp;&nbsp;$post_link  = &quot;&lt;a href=&#39;&quot; . esc_url( get_edit_post_link( $post_id ) ) . &quot;&#39;&gt;&quot;;<br/>
+&nbsp;&nbsp;&nbsp;$post_link .= esc_html( get_the_title( $post_id ) ) . &#39;&lt;/a&gt;&#39;;<br/>
+} else {<br/>
+&nbsp;&nbsp;&nbsp;$post_link = esc_html( get_the_title( $post_id ) );<br/>
+}<br/>
+?&gt;<br/>
+<br/>
+&lt;div class=&quot;misc&ndash;pub&ndash;section misc&ndash;pub&ndash;response&ndash;to&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: post link */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;In response to: %s&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;b&gt;&#39; . $post_link . &#39;&lt;/b&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;?php<br/>
+if ( $comment&ndash;&gt;comment_parent ) :<br/>
+&nbsp;&nbsp;&nbsp;$parent = get_comment( $comment&ndash;&gt;comment_parent );<br/>
+&nbsp;&nbsp;&nbsp;if ( $parent ) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$parent_link = esc_url( get_comment_link( $parent ) );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$name        = get_comment_author( $parent );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;div class=&quot;misc&ndash;pub&ndash;section misc&ndash;pub&ndash;reply&ndash;to&quot;&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: comment link */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;In reply to: %s&#39; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;b&gt;&lt;a href=&quot;&#39; . $parent_link . &#39;&quot;&gt;&#39; . $name . &#39;&lt;/a&gt;&lt;/b&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+endif;<br/>
+endif;<br/>
+?&gt;<br/>
+<br/>
+&lt;?php<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Filters miscellaneous actions for the edit comment form sidebar.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 4.3.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $html    Output HTML to display miscellaneous action.<br/>
+&nbsp;&nbsp;&nbsp; * @param object $comment Current comment object.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;echo apply_filters( &#39;edit_comment_misc_actions&#39;, &#39;&#39;, $comment );<br/>
+?&gt;<br/>
+<br/>
+&lt;/div&gt; &lt;!&ndash;&ndash; misc actions &ndash;&ndash;&gt;<br/>
+&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;div id=&quot;major&ndash;publishing&ndash;actions&quot;&gt;<br/>
+&lt;div id=&quot;delete&ndash;action&quot;&gt;<br/>
+&lt;?php echo &quot;&lt;a class=&#39;submitdelete deletion&#39; href=&#39;&quot; . wp_nonce_url( &#39;comment.php?action=&#39; . ( ! EMPTY_TRASH_DAYS ? &#39;deletecomment&#39; : &#39;trashcomment&#39; ) . &quot;&amp;amp;c=$comment&ndash;&gt;comment_ID&amp;amp;_wp_original_http_referer=&quot; . urlencode( wp_get_referer() ), &#39;delete&ndash;comment_&#39; . $comment&ndash;&gt;comment_ID ) . &quot;&#39;&gt;&quot; . ( ! EMPTY_TRASH_DAYS ? __( &#39;Delete Permanently&#39; ) : __( &#39;Move to Trash&#39; ) ) . &quot;&lt;/a&gt;\n&quot;; ?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;div id=&quot;publishing&ndash;action&quot;&gt;<br/>
+&lt;?php submit_button( __( &#39;Update&#39; ), &#39;primary large&#39;, &#39;save&#39;, false ); ?&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;&lt;!&ndash;&ndash; /submitdiv &ndash;&ndash;&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;div id=&quot;postbox&ndash;container&ndash;2&quot; class=&quot;postbox&ndash;container&quot;&gt;<br/>
+&lt;?php<br/>
+/** This action is documented in wp&ndash;admin/includes/meta&ndash;boxes.php */<br/>
+do_action( &#39;add_meta_boxes&#39;, &#39;comment&#39;, $comment );<br/>
+<br/>
+/**<br/>
+ * Fires when comment&ndash;specific meta boxes are added.<br/>
+ *<br/>
+ * @since 3.0.0<br/>
+ *<br/>
+ * @param WP_Comment $comment Comment object.<br/>
+ */<br/>
+do_action( &#39;add_meta_boxes_comment&#39;, $comment );<br/>
+<br/>
+do_meta_boxes( null, &#39;normal&#39;, $comment );<br/>
+<br/>
+$referer = wp_get_referer();<br/>
+?&gt;<br/>
+&lt;/div&gt;<br/>
+<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;c&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_ID ); ?&gt;&quot; /&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;p&quot; value=&quot;&lt;?php echo esc_attr( $comment&ndash;&gt;comment_post_ID ); ?&gt;&quot; /&gt;<br/>
+&lt;input name=&quot;referredby&quot; type=&quot;hidden&quot; id=&quot;referredby&quot; value=&quot;&lt;?php echo $referer ? esc_url( $referer ) : &#39;&#39;; ?&gt;&quot; /&gt;<br/>
+&lt;?php wp_original_referer_field( true, &#39;previous&#39; ); ?&gt;<br/>
+&lt;input type=&quot;hidden&quot; name=&quot;noredir&quot; value=&quot;1&quot; /&gt;<br/>
+<br/>
+&lt;/div&gt;&lt;!&ndash;&ndash; /post&ndash;body &ndash;&ndash;&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/div&gt;<br/>
+&lt;/form&gt;<br/>
+<br/>
+&lt;?php if ( ! wp_is_mobile() ) : ?&gt;<br/>
+&lt;script type=&quot;text/javascript&quot;&gt;<br/>
+try{document.post.name.focus();}catch(e){}<br/>
+&lt;/script&gt;<br/>
+&nbsp;&nbsp;&nbsp;&lt;?php<br/>
+endif;</body></html>

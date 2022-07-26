@@ -1,0 +1,27 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Loads the WordPress environment and template.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+if ( ! isset( $wp_did_header ) ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$wp_did_header = true;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Load the WordPress library.<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( __FILE__ ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Set up the WordPress query.<br/>
+&nbsp;&nbsp;&nbsp;wp();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Load the theme template.<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . WPINC . &#39;/template&ndash;loader.php&#39; );<br/>
+<br/>
+}</body></html>

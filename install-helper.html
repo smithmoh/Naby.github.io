@@ -1,0 +1,206 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Plugins may load this file to gain access to special helper functions for<br/>
+ * plugin installation. This file is not included by WordPress and it is<br/>
+ * recommended, to prevent fatal errors, that this file is included using<br/>
+ * require_once().<br/>
+ *<br/>
+ * These functions are not optimized for speed, but they should only be used<br/>
+ * once in a while, so speed shouldn&#39;t be a concern. If it is and you are<br/>
+ * needing to use these functions a lot, you might experience time outs. If you<br/>
+ * do, then it is advised to just write the SQL code yourself.<br/>
+ *<br/>
+ *     check_column( &#39;wp_links&#39;, &#39;link_description&#39;, &#39;mediumtext&#39; );<br/>
+ *     if ( check_column( $wpdb&ndash;&gt;comments, &#39;comment_author&#39;, &#39;tinytext&#39; ) ) {<br/>
+ *         echo &quot;ok\n&quot;;<br/>
+ *     }<br/>
+ *<br/>
+ *     $error_count = 0;<br/>
+ *     $tablename = $wpdb&ndash;&gt;links;<br/>
+ *     // Check the column.<br/>
+ *     if ( ! check_column($wpdb&ndash;&gt;links, &#39;link_description&#39;, &#39;varchar( 255 )&#39; ) ) {<br/>
+ *         $ddl = &quot;ALTER TABLE $wpdb&ndash;&gt;links MODIFY COLUMN link_description varchar(255) NOT NULL DEFAULT &#39;&#39; &quot;;<br/>
+ *         $q = $wpdb&ndash;&gt;query( $ddl );<br/>
+ *     }<br/>
+ *<br/>
+ *     if ( check_column( $wpdb&ndash;&gt;links, &#39;link_description&#39;, &#39;varchar( 255 )&#39; ) ) {<br/>
+ *         $res .= $tablename . &#39; &ndash; ok &lt;br /&gt;&#39;;<br/>
+ *     } else {<br/>
+ *         $res .= &#39;There was a problem with &#39; . $tablename . &#39;&lt;br /&gt;&#39;;<br/>
+ *         ++$error_count;<br/>
+ *     }<br/>
+ *<br/>
+ * @package WordPress<br/>
+ * @subpackage Plugin<br/>
+ */<br/>
+<br/>
+/** Load WordPress Bootstrap */<br/>
+require_once( dirname( dirname( __FILE__ ) ) . &#39;/wp&ndash;load.php&#39; );<br/>
+<br/>
+if ( ! function_exists( &#39;maybe_create_table&#39; ) ) :<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Create database table, if it doesn&#39;t already exist.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 1.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @global wpdb $wpdb WordPress database abstraction object.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $table_name Database table name.<br/>
+&nbsp;&nbsp;&nbsp; * @param string $create_ddl Create database table SQL.<br/>
+&nbsp;&nbsp;&nbsp; * @return bool False on error, true if already exists or success.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;function maybe_create_table( $table_name, $create_ddl ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;global $wpdb;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wpdb&ndash;&gt;get_col( &#39;SHOW TABLES&#39;, 0 ) as $table ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $table == $table_name ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Didn&#39;t find it, so try to create it.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wpdb&ndash;&gt;query( $create_ddl );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// We cannot directly tell that whether this succeeded!<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wpdb&ndash;&gt;get_col( &#39;SHOW TABLES&#39;, 0 ) as $table ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $table == $table_name ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+endif;<br/>
+<br/>
+if ( ! function_exists( &#39;maybe_add_column&#39; ) ) :<br/>
+&nbsp;&nbsp;&nbsp;/**<br/>
+&nbsp;&nbsp;&nbsp; * Add column to database table, if column doesn&#39;t already exist in table.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @since 1.0.0<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @global wpdb $wpdb WordPress database abstraction object.<br/>
+&nbsp;&nbsp;&nbsp; *<br/>
+&nbsp;&nbsp;&nbsp; * @param string $table_name Database table name<br/>
+&nbsp;&nbsp;&nbsp; * @param string $column_name Table column name<br/>
+&nbsp;&nbsp;&nbsp; * @param string $create_ddl SQL to add column to table.<br/>
+&nbsp;&nbsp;&nbsp; * @return bool False on failure. True, if already exists or was successful.<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;function maybe_add_column( $table_name, $column_name, $create_ddl ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;global $wpdb;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wpdb&ndash;&gt;get_col( &quot;DESC $table_name&quot;, 0 ) as $column ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $column == $column_name ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Didn&#39;t find it, so try to create it.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wpdb&ndash;&gt;query( $create_ddl );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// We cannot directly tell that whether this succeeded!<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wpdb&ndash;&gt;get_col( &quot;DESC $table_name&quot;, 0 ) as $column ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $column == $column_name ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+endif;<br/>
+<br/>
+/**<br/>
+ * Drop column from database table, if it exists.<br/>
+ *<br/>
+ * @since 1.0.0<br/>
+ *<br/>
+ * @global wpdb $wpdb WordPress database abstraction object.<br/>
+ *<br/>
+ * @param string $table_name Table name<br/>
+ * @param string $column_name Column name<br/>
+ * @param string $drop_ddl SQL statement to drop column.<br/>
+ * @return bool False on failure, true on success or doesn&#39;t exist.<br/>
+ */<br/>
+function maybe_drop_column( $table_name, $column_name, $drop_ddl ) {<br/>
+&nbsp;&nbsp;&nbsp;global $wpdb;<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $wpdb&ndash;&gt;get_col( &quot;DESC $table_name&quot;, 0 ) as $column ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $column == $column_name ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Found it, so try to drop it.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$wpdb&ndash;&gt;query( $drop_ddl );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// We cannot directly tell that whether this succeeded!<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach ( $wpdb&ndash;&gt;get_col( &quot;DESC $table_name&quot;, 0 ) as $column ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $column == $column_name ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;// Else didn&#39;t find it.<br/>
+&nbsp;&nbsp;&nbsp;return true;<br/>
+}<br/>
+<br/>
+/**<br/>
+ * Check column matches criteria.<br/>
+ *<br/>
+ * Uses the SQL DESC for retrieving the table info for the column. It will help<br/>
+ * understand the parameters, if you do more research on what column information<br/>
+ * is returned by the SQL statement. Pass in null to skip checking that<br/>
+ * criteria.<br/>
+ *<br/>
+ * Column names returned from DESC table are case sensitive and are listed:<br/>
+ *      Field<br/>
+ *      Type<br/>
+ *      Null<br/>
+ *      Key<br/>
+ *      Default<br/>
+ *      Extra<br/>
+ *<br/>
+ * @since 1.0.0<br/>
+ *<br/>
+ * @global wpdb $wpdb WordPress database abstraction object.<br/>
+ *<br/>
+ * @param string $table_name Table name<br/>
+ * @param string $col_name   Column name<br/>
+ * @param string $col_type   Column type<br/>
+ * @param bool   $is_null    Optional. Check is null.<br/>
+ * @param mixed  $key        Optional. Key info.<br/>
+ * @param mixed  $default    Optional. Default value.<br/>
+ * @param mixed  $extra      Optional. Extra value.<br/>
+ * @return bool True, if matches. False, if not matching.<br/>
+ */<br/>
+function check_column( $table_name, $col_name, $col_type, $is_null = null, $key = null, $default = null, $extra = null ) {<br/>
+&nbsp;&nbsp;&nbsp;global $wpdb;<br/>
+&nbsp;&nbsp;&nbsp;$diffs   = 0;<br/>
+&nbsp;&nbsp;&nbsp;$results = $wpdb&ndash;&gt;get_results( &quot;DESC $table_name&quot; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;foreach ( $results as $row ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $row&ndash;&gt;Field == $col_name ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Got our column, check the params.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $col_type != null ) &amp;&amp; ( $row&ndash;&gt;Type != $col_type ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;++$diffs;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $is_null != null ) &amp;&amp; ( $row&ndash;&gt;Null != $is_null ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;++$diffs;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $key != null ) &amp;&amp; ( $row&ndash;&gt;Key != $key ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;++$diffs;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $default != null ) &amp;&amp; ( $row&ndash;&gt;Default != $default ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;++$diffs;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( ( $extra != null ) &amp;&amp; ( $row&ndash;&gt;Extra != $extra ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;++$diffs;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ( $diffs &gt; 0 ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return true;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} // end if found our column<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+&nbsp;&nbsp;&nbsp;return false;<br/>
+}</body></html>

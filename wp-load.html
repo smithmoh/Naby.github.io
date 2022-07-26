@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title></title>
+</head>
+<body>
+&lt;?php<br/>
+/**<br/>
+ * Bootstrap file for setting the ABSPATH constant<br/>
+ * and loading the wp&ndash;config.php file. The wp&ndash;config.php<br/>
+ * file will then load the wp&ndash;settings.php file, which<br/>
+ * will then set up the WordPress environment.<br/>
+ *<br/>
+ * If the wp&ndash;config.php file is not found then an error<br/>
+ * will be displayed asking the visitor to set up the<br/>
+ * wp&ndash;config.php file.<br/>
+ *<br/>
+ * Will also search for wp&ndash;config.php in WordPress&#39; parent<br/>
+ * directory to allow the WordPress directory to remain<br/>
+ * untouched.<br/>
+ *<br/>
+ * @package WordPress<br/>
+ */<br/>
+<br/>
+/** Define ABSPATH as this file&#39;s directory */<br/>
+if ( ! defined( &#39;ABSPATH&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;ABSPATH&#39;, dirname( __FILE__ ) . &#39;/&#39; );<br/>
+}<br/>
+<br/>
+error_reporting( E_CORE_ERROR | E_CORE_WARNING | E_COMPILE_ERROR | E_ERROR | E_WARNING | E_PARSE | E_USER_ERROR | E_USER_WARNING | E_RECOVERABLE_ERROR );<br/>
+<br/>
+/*<br/>
+ * If wp&ndash;config.php exists in the WordPress root, or if it exists in the root and wp&ndash;settings.php<br/>
+ * doesn&#39;t, load wp&ndash;config.php. The secondary check for wp&ndash;settings.php has the added benefit<br/>
+ * of avoiding cases where the current directory is a nested installation, e.g. / is WordPress(a)<br/>
+ * and /blog/ is WordPress(b).<br/>
+ *<br/>
+ * If neither set of conditions is true, initiate loading the setup process.<br/>
+ */<br/>
+if ( file_exists( ABSPATH . &#39;wp&ndash;config.php&#39; ) ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/** The config file resides in ABSPATH */<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . &#39;wp&ndash;config.php&#39; );<br/>
+<br/>
+} elseif ( @file_exists( dirname( ABSPATH ) . &#39;/wp&ndash;config.php&#39; ) &amp;&amp; ! @file_exists( dirname( ABSPATH ) . &#39;/wp&ndash;settings.php&#39; ) ) {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/** The config file resides one level above ABSPATH but is not part of another installation */<br/>
+&nbsp;&nbsp;&nbsp;require_once( dirname( ABSPATH ) . &#39;/wp&ndash;config.php&#39; );<br/>
+<br/>
+} else {<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// A config file doesn&#39;t exist<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WPINC&#39;, &#39;wp&ndash;includes&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . WPINC . &#39;/load.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Standardize $_SERVER variables across setups.<br/>
+&nbsp;&nbsp;&nbsp;wp_fix_server_vars();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . WPINC . &#39;/functions.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;$path = wp_guess_url() . &#39;/wp&ndash;admin/setup&ndash;config.php&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;/*<br/>
+&nbsp;&nbsp;&nbsp; * We&#39;re going to redirect to setup&ndash;config.php. While this shouldn&#39;t result<br/>
+&nbsp;&nbsp;&nbsp; * in an infinite loop, that&#39;s a silly thing to assume, don&#39;t you think? If<br/>
+&nbsp;&nbsp;&nbsp; * we&#39;re traveling in circles, our last&ndash;ditch effort is &quot;Need more help?&quot;<br/>
+&nbsp;&nbsp;&nbsp; */<br/>
+&nbsp;&nbsp;&nbsp;if ( false === strpos( $_SERVER[&#39;REQUEST_URI&#39;], &#39;setup&ndash;config&#39; ) ) {<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;header( &#39;Location: &#39; . $path );<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br/>
+&nbsp;&nbsp;&nbsp;}<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;define( &#39;WP_CONTENT_DIR&#39;, ABSPATH . &#39;wp&ndash;content&#39; );<br/>
+&nbsp;&nbsp;&nbsp;require_once( ABSPATH . WPINC . &#39;/version.php&#39; );<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_check_php_mysql_versions();<br/>
+&nbsp;&nbsp;&nbsp;wp_load_translations_early();<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;// Die with an error message<br/>
+&nbsp;&nbsp;&nbsp;$die = sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: wp&ndash;config.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &quot;There doesn&#39;t seem to be a %s file. I need this before we can get started.&quot; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;code&gt;wp&ndash;config.php&lt;/code&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$die .= &#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: Codex URL */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &quot;Need more help? &lt;a href=&#39;%s&#39;&gt;We got it&lt;/a&gt;.&quot; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &#39;https://codex.wordpress.org/Editing_wp&ndash;config.php&#39; )<br/>
+&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$die .= &#39;&lt;p&gt;&#39; . sprintf(<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* translators: %s: wp&ndash;config.php */<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__( &quot;You can create a %s file through a web interface, but this doesn&#39;t work for all server setups. The safest way is to manually create the file.&quot; ),<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;&lt;code&gt;wp&ndash;config.php&lt;/code&gt;&#39;<br/>
+&nbsp;&nbsp;&nbsp;) . &#39;&lt;/p&gt;&#39;;<br/>
+&nbsp;&nbsp;&nbsp;$die .= &#39;&lt;p&gt;&lt;a href=&quot;&#39; . $path . &#39;&quot; class=&quot;button button&ndash;large&quot;&gt;&#39; . __( &#39;Create a Configuration File&#39; ) . &#39;&lt;/a&gt;&#39;;<br/>
+<br/>
+&nbsp;&nbsp;&nbsp;wp_die( $die, __( &#39;WordPress &amp;rsaquo; Error&#39; ) );<br/>
+}</body></html>
